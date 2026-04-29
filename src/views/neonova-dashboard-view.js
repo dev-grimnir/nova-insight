@@ -350,7 +350,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
             btn.dataset.label = tab.label;
             const { connected, disconnected } = tab.getConnectionCounts();
 
-            const bellOpacity = tab.isNetworkTab ? '1' : '0.35';
+            const bellColor = tab.isNetworkTab ? '#34d399' : '#52525b';
             const bellTitle = tab.isNetworkTab
                 ? 'Notifications ON for this tab (click to disable)'
                 : 'Notifications OFF for this tab (click to enable)';
@@ -358,7 +358,12 @@ class NeonovaDashboardView extends BaseNeonovaView {
             btn.innerHTML = `
                 <span class="tab-bell"
                       title="${bellTitle}"
-                      style="margin-right:6px; cursor:pointer; opacity:${bellOpacity}; font-size:13px; line-height:1;">🔔</span>
+                      style="margin-right:6px; cursor:pointer; color:${bellColor}; display:inline-flex; align-items:center; vertical-align:middle;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                         fill="currentColor" style="display:block;">
+                        <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/>
+                    </svg>
+                </span>
                 <span class="tab-label">${tab.label}</span>
                 <span style="margin-left: 6px; font-size: 12px; font-weight: 600; font-family: ui-monospace, monospace;">
                     <span style="color: #34d399;">${connected}</span><span style="color: #71717a;">/</span><span style="color: #ef4444;">${disconnected}</span>
