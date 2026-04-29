@@ -343,25 +343,40 @@ class NeonovaDashboardView extends BaseNeonovaView {
     renderTabBar() {
         if (!this.tabBar) return;
         this.tabBar.innerHTML = '';
-    
+
         for (const tab of this.controller.getTabController().tabs) {
             const btn = document.createElement('button');
             btn.className = `neonova-tab-btn${tab.isActive ? ' active' : ''}`;
             btn.dataset.label = tab.label;
             const { connected, disconnected } = tab.getConnectionCounts();
+
+            const bellOpacity = tab.isNetworkTab ? '1' : '0.35';
+            const bellTitle = tab.isNetworkTab
+                ? 'Notifications ON for this tab (click to disable)'
+                : 'Notifications OFF for this tab (click to enable)';
+
             btn.innerHTML = `
+                <span class="tab-bell"
+                      title="${bellTitle}"
+                      style="margin-right:6px; cursor:pointer; opacity:${bellOpacity}; font-size:13px; line-height:1;">🔔</span>
                 <span class="tab-label">${tab.label}</span>
                 <span style="margin-left: 6px; font-size: 12px; font-weight: 600; font-family: ui-monospace, monospace;">
                     <span style="color: #34d399;">${connected}</span><span style="color: #71717a;">/</span><span style="color: #ef4444;">${disconnected}</span>
                 </span>
                 <span class="tab-close" title="Close tab">&times;</span>
             `;
-    
+
+            btn.querySelector('.tab-bell').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.controller.getTabController().toggleNetworkTab(tab.label);
+                this.renderTabBar();
+            });
+
             btn.querySelector('.tab-label').addEventListener('click', () => {
                 this.controller.getTabController().switchTab(tab.label);
                 this.renderTabBar();
             });
-    
+
             btn.querySelector('.tab-close').addEventListener('click', (e) => {
                 e.stopPropagation();
                 const confirmed = confirm(`Close tab "${tab.label}"?`);
@@ -370,8 +385,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     this.renderTabBar();
                 }
             });
-    
-            // Double-click label to rename
+
             btn.querySelector('.tab-label').addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 const newLabel = prompt('Rename tab:', tab.label);
@@ -380,11 +394,10 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     this.renderTabBar();
                 }
             });
-    
+
             this.tabBar.appendChild(btn);
         }
-    
-        // Add tab button
+
         const addBtn = document.createElement('button');
         addBtn.className = 'neonova-tab-add';
         addBtn.title = 'Add tab';
@@ -398,31 +411,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
         });
         this.tabBar.appendChild(addBtn);
     }
-
-/**
-    clearRows() {
-        const tbody = this.panel.querySelector('#customer-table-body');
-        if (tbody) tbody.replaceChildren();  // modern, clean (or innerHTML = '')
-    }
     
-    appendRow(trElement) {
-        const tbody = this.panel.querySelector('#customer-table-body');
-        if (tbody && trElement instanceof HTMLElement) {
-            tbody.appendChild(trElement);
-        }
-    }
-    
-    setRows(rowElements) {
-        this.clearRows();
-        if (!Array.isArray(rowElements)) return;
-        const fragment = document.createDocumentFragment();
-        rowElements.forEach(tr => {
-            if (tr instanceof HTMLElement) fragment.appendChild(tr);
-        });
-        const tbody = this.panel.querySelector('#customer-table-body');
-        if (tbody) tbody.appendChild(fragment);
-    }
-**/
     attachHeaderListeners() {
         const privacyBtn = this.header.querySelector('#privacy-toggle-btn');
         if (privacyBtn) {
