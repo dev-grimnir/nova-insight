@@ -21,6 +21,7 @@ class NeonovaTabController {
         
         const rows = [];
         for (const ctrl of this.getActiveTab().customers) {
+            ctrl.view.update();
             const row = ctrl.getRowElement();
             if (row) rows.push(row);
         }
