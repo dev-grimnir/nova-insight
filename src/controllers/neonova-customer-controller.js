@@ -25,6 +25,12 @@ class NeonovaCustomerController {
         return this.#model.friendlyName;
     }
 
+    async toggleAlertsSuppressed() {
+        this.#model.alertsSuppressed = !this.#model.alertsSuppressed;
+        await this.dashboardController.getTabController().save();
+        this.view.update();
+    }
+
     toJSON() {
         // Delegate to the model so buffer + any future fields come along automatically
         return this.#model.toJSON();
@@ -36,6 +42,7 @@ class NeonovaCustomerController {
             json.friendlyName,
             dashboardController,
             {
+                alertsSuppressed: json.alertsSuppressed
                 status: json.status || 'Connecting...',
                 durationSec: json.durationSec ?? 0,
                 lastUpdate: json.lastUpdate,
