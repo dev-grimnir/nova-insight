@@ -42,7 +42,7 @@ class NeonovaCustomerController {
             json.friendlyName,
             dashboardController,
             {
-                alertsSuppressed: json.alertsSuppressed
+                alertsSuppressed: json.alertsSuppressed,
                 status: json.status || 'Connecting...',
                 durationSec: json.durationSec ?? 0,
                 lastUpdate: json.lastUpdate,
