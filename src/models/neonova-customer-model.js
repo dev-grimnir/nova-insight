@@ -10,6 +10,8 @@ class NeonovaCustomerModel {
         this.lastUpdate = state.lastUpdate || new Date().toLocaleString();
         this.lastEventTime = state.lastEventTime ? new Date(state.lastEventTime) : null;
 
+        this.alertsSuppressed = state.alertsSuppressed === true;
+        
         this.eventHistory = [];
         if (Array.isArray(state.eventHistory)) {
             for (const e of state.eventHistory) {
@@ -93,6 +95,7 @@ class NeonovaCustomerModel {
     }
 
     toJSON() {
+        alertsSuppressed: this.alertsSuppressed
         const historyOut = [];
         for (const e of this.eventHistory) {
             historyOut.push({
