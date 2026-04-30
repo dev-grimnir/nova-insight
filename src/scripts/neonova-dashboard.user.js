@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NovaSubscriber - Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      40.7
+// @version      41.0
 // @description  Real-time customer modem connection dashboard (separate script)
 // @author       dev-grimnir
 // @match        https://admin.neonova.net/*
@@ -13,10 +13,12 @@
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/core/utils.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/log-entry.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/neonova-customer-model.js
+// @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/neonova-admin-manager-model.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/neonova-dashboard-model.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/neonova-tab-model.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/neonova-report-model.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/models/neonova-snapshot-model.js
+// @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/controllers/neonova-admin-manager-controller.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/controllers/neonova-crypto-controller.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/controllers/neonova-http-controller.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/controllers/neonova-progress-controller.js
@@ -32,6 +34,7 @@
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/controllers/neonova-dashboard-controller.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/views/base-neonova-view.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/views/neonova-base-modal-view.js
+// @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/views/neonova-admin-manager-view.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/views/neonova-inline-snapshot-view.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/views/neonova-spinner-view.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/dev/src/views/neonova-passphrase-view.js
