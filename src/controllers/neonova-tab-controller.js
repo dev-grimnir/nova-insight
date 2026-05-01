@@ -213,8 +213,7 @@ class NeonovaTabController {
     async save() {
         try {
             const json = JSON.stringify({
-                tabs: this.tabs.map(t => t.toJSON()),
-                admins: this.dashboardController.getAdminManagerModel().toJSON()
+                tabs: this.tabs.map(t => t.toJSON())
             });
             const encrypted = await NeonovaCryptoController.encryptData(json);
             localStorage.setItem('novaDashboardTabs', encrypted);
@@ -232,16 +231,6 @@ class NeonovaTabController {
         try {
             const json = JSON.parse(await NeonovaCryptoController.decryptData(data));
             this.tabs = json.tabs.map(t => NeonovaTabModel.fromJSON(t, this.dashboardController));
-            if (Array.isArray(json.admins)) {
-                const mgr = this.dashboardController.getAdminManagerModel();
-                mgr.admins = json.admins.map(a => NeonovaAdminController.fromJSON(a, this.dashboardController));
-            }
-            if (Array.isArray(json.admins)) {
-                this.dashboardController.model.admins = json.admins.map(a => ({
-                    name: a.name,
-                    phoneNumber: a.phoneNumber
-                }));
-            }
             this.view.render();
         } catch (e) {
             console.error('[NeonovaTabController.load]', e);
