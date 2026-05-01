@@ -95,6 +95,21 @@ class NeonovaCustomerModel {
         this.eventHistory = trimmed;
     }
 
+    static fromJSON(json) {
+        return new NeonovaCustomerModel(
+            json.radiusUsername,
+            json.friendlyName,
+            {
+                status: json.status || 'Connecting...',
+                durationSec: json.durationSec ?? 0,
+                lastUpdate: json.lastUpdate,
+                lastEventTime: json.lastEventTime,
+                alertsSuppressed: json.alertsSuppressed,
+                eventHistory: json.eventHistory
+            }
+        );
+    }
+
     toJSON() {
         const historyOut = [];
         for (const e of this.eventHistory) {
