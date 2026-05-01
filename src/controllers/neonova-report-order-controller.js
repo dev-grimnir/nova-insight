@@ -53,12 +53,17 @@ class NeonovaReportOrderController {
     }
 
     startProgressController(startDate, endDate) {
-        // Controller creates the next controller
+        // Reports run from midnight on the requested start day through the
+        // exact requested end time. Normalize the start here so every entry
+        // path (quick, custom, future) gets the same treatment.
+        const normalizedStart = new Date(startDate);
+        normalizedStart.setHours(0, 0, 0, 0);
+
         const progressCtrl = new NeonovaProgressController();
         progressCtrl.start(
             this.username,
             this.friendlyName,
-            startDate,
+            normalizedStart,
             endDate
         );
         this.view.close();
