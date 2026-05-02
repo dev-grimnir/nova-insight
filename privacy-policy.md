@@ -7,11 +7,10 @@ This Privacy Policy explains how Neonova Insight collects, uses, and protects yo
 
 ### Information We Collect
 We collect only the information necessary to deliver the service:
-- Device status, performance metrics, and diagnostic data
 - Basic contact details (e.g., phone number) for message delivery
 
 ### How We Use Your Information
-All collected data is used **solely** to generate and deliver diagnostic alerts, monitoring reports, and system notifications.
+All collected data is used **solely** to generate and deliver diagnostic alerts.
 
 ### Data Sharing & Disclosure
 We **do not** sell, rent, or share your personal information with any third parties for marketing or unrelated purposes.
