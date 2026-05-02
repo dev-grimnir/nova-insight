@@ -1,5 +1,6 @@
 class NeonovaCustomerModel {
     static RETENTION_MS = 24 * 60 * 60 * 1000;
+    #alertsSuppressed = false;
 
     constructor(radiusUsername, friendlyName = '', initialState = null) {
         const state = initialState || {};
@@ -133,6 +134,14 @@ class NeonovaCustomerModel {
             lastAlertSent: this.lastAlertSent,
             eventHistory: historyOut
         };
+    }
+
+    toggleAlertsSuppressed() {
+        if (this.#alertsSuppressed === true {
+            this.#alertsSuppressed = false;
+        } else {
+            this.#alertsSuppressed = true;
+        }
     }
 
     markDisconnected(now = Date.now()) {
