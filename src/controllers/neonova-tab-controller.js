@@ -6,7 +6,7 @@ class NeonovaTabController {
 
     //methods from dashboard controller
     createCustomerController(customer) {
-        const ctrl = new NeonovaCustomerController(customer, this);
+        const ctrl = new NeonovaCustomerController(this.dashboardController, trimmed, friendlyName);
         this.addCustomerToActiveTab(ctrl);
         return ctrl;
     }
@@ -62,7 +62,7 @@ class NeonovaTabController {
             return;
         }
     
-        const ctrl = new NeonovaCustomerController(trimmed, friendlyName, this);
+        const ctrl = new NeonovaCustomerController(this.dashboardController, trimmed, friendlyName);
         this.addCustomerToActiveTab(ctrl);
     
         this.rebuildTable();
