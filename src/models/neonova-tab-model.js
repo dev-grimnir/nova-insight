@@ -43,7 +43,7 @@ class NeonovaTabModel {
         const tab = new NeonovaTabModel(json.label, json.isActive, json.isNetworkTab === true);
         tab.customers = json.customers.map(c => {
             const model = NeonovaCustomerModel.fromJSON(c);
-            return new NeonovaCustomerController(model, dashboardController);
+            return new NeonovaCustomerController(dashboardController, null, null, model);
         });
         return tab;
     }
