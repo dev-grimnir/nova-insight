@@ -8,7 +8,7 @@ By using Neonova Insight, you agree to these Terms of Service.
 ### 1. Service Description
 Neonova Insight is a diagnostic monitoring system that delivers relevant system alerts, status updates, and diagnostic information to authorized recipients.
 
-The service is provided **solely for receiving** monitoring and diagnostic communications.
+The service is provided **solely for receiving** monitoring communications.
 
 ### 2. Acceptable Use & Restrictions
 You agree to use the service only for its intended purpose. You may **not**:
