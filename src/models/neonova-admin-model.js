@@ -29,4 +29,11 @@ class NeonovaAdminModel {
             phoneNumber: this.phoneNumber
         };
     }
+
+    static fromJSON(json) {
+        return new NeonovaAdminModel(
+            json.name,
+            json.phoneNumber || ''
+        );
+    }
 }
