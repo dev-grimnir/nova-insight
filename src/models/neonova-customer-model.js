@@ -137,7 +137,7 @@ class NeonovaCustomerModel {
     }
 
     toggleAlertsSuppressed() {
-        if (this.#alertsSuppressed === true {
+        if (this.#alertsSuppressed === true) {
             this.#alertsSuppressed = false;
         } else {
             this.#alertsSuppressed = true;
