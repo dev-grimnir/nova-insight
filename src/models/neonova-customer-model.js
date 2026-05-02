@@ -154,5 +154,9 @@ class NeonovaCustomerModel {
         this.disconnectedSince = null;
         this.lastAlertSent = null;
     }
-    
+
+    toggleAlertsSuppressed() {
+        this.alertsSuppressed = !this.alertsSuppressed;
+        return this.alertsSuppressed;
+    }
 }
