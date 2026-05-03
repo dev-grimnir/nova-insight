@@ -1,12 +1,8 @@
-0 - make toast look better
-1 - lag when adding customer to dashboard
-2 - browser alert when adding customer that's already on tab
-3 - snapshot tooltip broken
-4 - dashboard minimizes when esc is pressed on open modal
-5 - keyboard cursor needs to be on radius username by default on add customer view
-6 - refine the appearance of the snapshot view.  it's not using space efficiently.
-7 - clicking on the status badge causes a browser alert, if no data is found within the automated range.
-8 - when maximized, the bottom of the dashboard should be slightly higher. it becomes tricky to edit a customer, with the dashboard up.
-9 - geolocating customers and building a map of which customers are fed out of which remote.
-10 - increase the visibility, when a row is moused over in the dashboard controller.
-11 - long disconnect durations should be red, not green, on the report.
+snapshot tooltip broken
+dashboard minimizes when esc is pressed on open modal
+keyboard cursor needs to be on radius username by default on add customer view
+refine the appearance of the snapshot view.  it's not using space efficiently.
+when maximized, the bottom of the dashboard should be slightly higher. it becomes tricky to edit a customer, with the dashboard up.
+geolocating customers and building a map of which customers are fed out of which remote.
+increase the visibility, when a row is moused over in the dashboard controller.
+long disconnect durations should be red, not green, on the report.
