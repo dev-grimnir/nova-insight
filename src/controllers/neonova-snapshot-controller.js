@@ -88,7 +88,7 @@ class NeonovaSnapshotController {
         spinner.hide();
 
         if (!model) {
-            alert('No connection data found for this range.');
+            NeonovaToast.error("No change in status for this customer within the requested range.");
             return;
         }
 
