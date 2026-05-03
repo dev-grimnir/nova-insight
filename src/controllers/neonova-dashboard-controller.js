@@ -245,9 +245,7 @@ class NeonovaDashboardController {
             if (!latest) {
                 if (latest === null) {
                     customer.update('Account Not Found', 0);
-                    this.view.showToast('Customer not found in RADIUS', {
-                        type: 'error',
-                        duration: 5000});
+                    NeonovaToast.error('Customer not found in RADIUS');
                     return;
                 } else if (customer.lastEventTime !== null) {
                     // Existing customer with no new events — increment duration
