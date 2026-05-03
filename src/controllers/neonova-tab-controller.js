@@ -84,13 +84,11 @@ class NeonovaTabController {
         try {
             await this.dashboardController.updateCustomerStatus(ctrl.model);
 
-            /**
             if (ctrl.model.status === 'Account Not Found') {
                 this.remove(trimmed);
-                this.dashboardController.view.showToast('Customer not found in RADIUS', { type: 'error', duration: 5000 });
+                NeonovaToast.error('Customer not found in RADIUS');
                 return;
             }
-            **/
             
             ctrl.view.update();
             await this.save();
