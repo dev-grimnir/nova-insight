@@ -59,7 +59,7 @@ class NeonovaTabController {
     
         const activeTab = this.getActiveTab();
         if (activeTab.customers.find(c => c.radiusUsername === trimmed)) {
-            alert('Already added');
+            NeonovaToast.error("This customer has already beeen added to this tab.");
             return;
         }
     
@@ -83,13 +83,13 @@ class NeonovaTabController {
         
         try {
             await this.dashboardController.updateCustomerStatus(ctrl.model);
-    
+
             if (ctrl.model.status === 'Account Not Found') {
                 this.remove(trimmed);
-                this.dashboardController.view.showToast('Customer not found in RADIUS', { type: 'error', duration: 5000 });
+                NeonovaToast.error('Customer not found in RADIUS');
                 return;
             }
-    
+            
             ctrl.view.update();
             await this.save();
             this.rebuildTable();

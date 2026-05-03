@@ -27,29 +27,6 @@ class NeonovaDashboardView extends BaseNeonovaView {
         return `<thead><tr class="text-xs uppercase tracking-widest text-zinc-500">${ths}</tr></thead>`;
     }
 
-    showToast(message, { type = 'error', duration = 5000 } = {}) {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.className = `fixed bottom-6 right-6 px-6 py-3 rounded-xl text-white shadow-2xl z-[10000] animate-fade-in-up transition-opacity duration-300`;
-    
-        // Style based on type (dark theme friendly)
-        if (type === 'error') {
-            toast.classList.add('bg-red-700/90', 'border', 'border-red-500/50');
-        } else if (type === 'success') {
-            toast.classList.add('bg-emerald-700/90', 'border', 'border-emerald-500/50');
-        } else {
-            toast.classList.add('bg-zinc-800/90', 'border', 'border-zinc-600');
-        }
-    
-        document.body.appendChild(toast);
-    
-        // Fade out and remove
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    }
-
     getHeaderHTML() {
         const pollIcon = this.controller.model.isPollingPaused ? 'fa-play' : 'fa-pause';
         const pollText = this.controller.model.isPollingPaused ? 'Resume' : 'Pause';
@@ -323,10 +300,10 @@ class NeonovaDashboardView extends BaseNeonovaView {
     
         this.escListener = (e) => {
             if (e.key !== 'Escape') return;
-            if (!this.isMinimized && !this.controller.isModalActive()) {
-                e.preventDefault();
-                this.toggleMinimize();
-            }
+            if (this.isMinimized) return;
+            if (document.querySelector('.neonova-modal, #add-customer-modal, #passphrase-modal, [id*="modal"]')) return;
+            e.preventDefault();
+            this.toggleMinimize();
         };
         document.addEventListener('keydown', this.escListener, { capture: true });
     
@@ -517,7 +494,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
     }
 
     applyMaximizedStyles() {
-        this.panel.style.height = 'calc(100vh - 80px)';
+        this.panel.style.height = 'calc(100vh - 100px)';
         this.panel.style.top = '60px';
         this.panel.style.bottom = 'auto';
         this.panel.style.border = '1px solid #27272a';

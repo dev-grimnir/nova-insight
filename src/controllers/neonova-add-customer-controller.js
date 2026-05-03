@@ -14,15 +14,13 @@ class NeonovaAddCustomerController {
     
         const un = this.#sanitizeAndValidateRadiusUsername(radiusUsername);
         if (!un) return;
-    
+        this.view.hide();
         try {
             await this.#tabController.add(un, friendlyName);
         } catch (err) {
             this.view.showError("Failed to add customer: " + err.message);
             return;
         }
-    
-        this.view.hide();
     }
 
     #sanitizeAndValidateRadiusUsername(raw) {

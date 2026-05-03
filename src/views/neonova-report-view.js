@@ -230,7 +230,7 @@ class NeonovaReportView extends NeonovaBaseModalView {
                 <tr class="hover:bg-zinc-800/70 transition-colors">
                     <td class="p-6 text-zinc-200">${ld.stopDate.toLocaleString()}</td>
                     <td class="p-6 text-zinc-200">${ld.startDate.toLocaleString()}</td>
-                    <td class="p-6 text-right font-semibold text-${this.accent}-400">${durationStr}</td>
+                    <td class="p-6 text-right font-semibold text-red-400">${durationStr}</td>
                 </tr>`;
         });
         html += `</tbody></table>`;

@@ -60,7 +60,7 @@ class NeonovaSnapshotView extends NeonovaBaseModalView {
         if (!content) return;
         content.innerHTML = `
             <div class="max-w-6xl mx-auto">
-                <div class="bg-zinc-900 border border-zinc-700 rounded-3xl p-8" style="height: 620px; min-height: 620px;">
+                <div class="bg-zinc-900 border border-zinc-700 rounded-3xl p-8" style="height: 360px; min-height: 360px;">
                     <canvas id="snapshotChart" class="w-full h-full"></canvas>
                 </div>
             </div>

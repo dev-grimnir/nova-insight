@@ -243,20 +243,7 @@ class NeonovaDashboardController {
 
             // No logs at all (even after 30 days) → safe default
             if (!latest) {
-                if (latest === null) {
-                    customer.update('Account Not Found', 0);
-                    this.view.showToast('Customer not found in RADIUS', {
-                        type: 'error',
-                        duration: 5000});
-                    return;
-                } else if (customer.lastEventTime !== null) {
-                    // Existing customer with no new events — increment duration
-                    const eventDate = new Date(customer.lastEventTime);
-                    if (!isNaN(eventDate.getTime())) {
-                        const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
-                        if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
-                    }
-                }
+                customer.update('Account Not Found', 0);
                 return;
             }
 

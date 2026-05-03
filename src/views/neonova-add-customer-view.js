@@ -52,6 +52,7 @@ class NeonovaAddCustomerView extends NeonovaBaseModalView {
 
         super.createModal(html);
         this.attachListeners();
+        this.modal.querySelector('#radius-username')?.focus();
 
         // Preserve original Enter key behavior (base only handles Escape)
         this._enterListener = (e) => {
