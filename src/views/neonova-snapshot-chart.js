@@ -258,7 +258,7 @@ class NeonovaSnapshotChart {
                                 if (ctx.parsed.y === 0) return "";
 
                                 const currentX = ctx.parsed.x;
-                                const period = this.periods.find(p => currentX >= p.startMs && currentX <= p.endMs);
+                                const period = periods.find(p => currentX >= p.startMs && currentX <= p.endMs);
                                 if (!period) return '';
 
                                 const fmt = (ms) => new Date(ms).toLocaleString([], {
@@ -276,7 +276,7 @@ class NeonovaSnapshotChart {
                             },
                             labelColor: (ctx) => {
                                 if (ctx.parsed.y === 0) return null;
-                                const period = this.periods.find(p => ctx.parsed.x >= p.startMs && ctx.parsed.x <= p.endMs);
+                                const period = periods.find(p => ctx.parsed.x >= p.startMs && ctx.parsed.x <= p.endMs);
                                 if (!period) return null;
                                 const color = period.isConnected ? '#10b981' : '#ef4444';
                                 return {
