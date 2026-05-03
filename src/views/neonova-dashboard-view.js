@@ -494,7 +494,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
     }
 
     applyMaximizedStyles() {
-        this.panel.style.height = 'calc(100vh - 120px)';
+        this.panel.style.height = 'calc(100vh - 100px)';
         this.panel.style.top = '60px';
         this.panel.style.bottom = 'auto';
         this.panel.style.border = '1px solid #27272a';
