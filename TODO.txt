@@ -6,3 +6,5 @@
 5 - keyboard cursor needs to be on radius username by default on add customer view
 6 - refine the appearance of the snapshot view.  it's not using space efficiently.
 7 - clicking on the status badge causes a browser alert, if no data is found within the automated range.
+8 - when maximized, the bottom of the dashboard should be slightly higher. it becomes tricky to edit a customer, with the dashboard up.
+9 - geolocating customers and building a map of which customers are fed out of which remote.
