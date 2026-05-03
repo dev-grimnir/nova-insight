@@ -300,10 +300,10 @@ class NeonovaDashboardView extends BaseNeonovaView {
     
         this.escListener = (e) => {
             if (e.key !== 'Escape') return;
-            if (!this.isMinimized && !this.controller.isModalActive()) {
-                e.preventDefault();
-                this.toggleMinimize();
-            }
+            if (this.isMinimized) return;
+            if (document.querySelector('.neonova-modal, #add-customer-modal, #passphrase-modal, [id*="modal"]')) return;
+            e.preventDefault();
+            this.toggleMinimize();
         };
         document.addEventListener('keydown', this.escListener, { capture: true });
     
@@ -494,7 +494,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
     }
 
     applyMaximizedStyles() {
-        this.panel.style.height = 'calc(100vh - 80px)';
+        this.panel.style.height = 'calc(100vh - 120px)';
         this.panel.style.top = '60px';
         this.panel.style.bottom = 'auto';
         this.panel.style.border = '1px solid #27272a';
