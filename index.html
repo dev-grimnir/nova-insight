@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neonova Insight — Interactive Demo</title>
+
+  <!-- Tailwind (Play CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans">
+
+  <!-- Phase 1 placeholder. Replaced when synthetic data / dashboard mount lands in Phase 2. -->
+  <main class="min-h-screen flex items-center justify-center p-8">
+    <div class="text-center max-w-md">
+      <h1 class="text-2xl font-semibold mb-2">Neonova Insight — Demo</h1>
+      <p class="text-slate-400 text-sm">
+        Phase 1: deploy pipeline verification. Open DevTools → Console.
+        All production sources should load with no 404s and no syntax errors.
+      </p>
+    </div>
+  </main>
+
+  <!-- =====================================================================
+       Production sources — loaded in @require order from the userscript.
+       Order matters: core → models → controllers → views.
+       ===================================================================== -->
+
+  <!-- Core -->
+  <script src="src/core/utils.js"></script>
+  <script src="src/core/neonova-toast.js"></script>
+
+  <!-- Models -->
+  <script src="src/models/neonova-admin-model.js"></script>
+  <script src="src/models/log-entry.js"></script>
+  <script src="src/models/neonova-customer-model.js"></script>
+  <script src="src/models/neonova-admin-manager-model.js"></script>
+  <script src="src/models/neonova-dashboard-model.js"></script>
+  <script src="src/models/neonova-tab-model.js"></script>
+  <script src="src/models/neonova-report-model.js"></script>
+  <script src="src/models/neonova-snapshot-model.js"></script>
+
+  <!-- Controllers -->
+  <script src="src/controllers/neonova-admin-controller.js"></script>
+  <script src="src/controllers/neonova-admin-manager-controller.js"></script>
+  <script src="src/controllers/neonova-crypto-controller.js"></script>
+  <script src="src/controllers/neonova-http-controller.js"></script>
+  <script src="src/controllers/neonova-progress-controller.js"></script>
+  <script src="src/controllers/neonova-collector.js"></script>
+  <script src="src/controllers/neonova-analyzer.js"></script>
+  <script src="src/controllers/neonova-passphrase-controller.js"></script>
+  <script src="src/controllers/neonova-customer-controller.js"></script>
+  <script src="src/controllers/neonova-report-order-controller.js"></script>
+  <script src="src/controllers/neonova-report-controller.js"></script>
+  <script src="src/controllers/neonova-snapshot-controller.js"></script>
+  <script src="src/controllers/neonova-tab-controller.js"></script>
+  <script src="src/controllers/neonova-add-customer-controller.js"></script>
+  <script src="src/controllers/neonova-dashboard-controller.js"></script>
+  <script src="src/controllers/neonova-notifier-controller.js"></script>
+
+  <!-- Views -->
+  <script src="src/views/base-neonova-view.js"></script>
+  <script src="src/views/neonova-base-modal-view.js"></script>
+  <script src="src/views/neonova-admin-view.js"></script>
+  <script src="src/views/neonova-admin-manager-view.js"></script>
+  <script src="src/views/neonova-inline-snapshot-view.js"></script>
+  <script src="src/views/neonova-spinner-view.js"></script>
+  <script src="src/views/neonova-passphrase-view.js"></script>
+  <script src="src/views/neonova-customer-view.js"></script>
+  <script src="src/views/neonova-tab-view.js"></script>
+  <script src="src/views/neonova-snapshot-chart.js"></script>
+  <script src="src/views/neonova-snapshot-view.js"></script>
+  <script src="src/views/neonova-report-snapshot-view.js"></script>
+  <script src="src/views/neonova-report-order-view.js"></script>
+  <script src="src/views/neonova-progress-view.js"></script>
+  <script src="src/views/neonova-report-view.js"></script>
+  <script src="src/views/neonova-add-customer-view.js"></script>
+  <script src="src/views/neonova-dashboard-view.js"></script>
+
+</body>
+</html>
