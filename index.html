@@ -9,6 +9,13 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <link rel="stylesheet" href="demo/tailwind.min.css">
+  <style>
+    /* Production runs on a host page whose CSS resets buttons to
+       white-space: nowrap. The standalone demo page has no such reset. */
+    .neonova-dashboard button {
+      white-space: nowrap;
+    }
+  </style>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
