@@ -1,0 +1,193 @@
+# Neonova-insight Interactive UI Demo — Memory File
+
+## Project context
+- Repo: github.com/dev-grimnir/neonova-insight
+- Workflow: branch dev → fix one discrete problem → merge to main → delete dev → re-branch
+- The demo lives on its own `demo` branch off main
+- Source pull direction: main → demo, never the reverse
+- File URL pattern: https://raw.githubusercontent.com/dev-grimnir/neonova-insight/{branch}/src/[layer]/[File].js
+- README is at github.com/dev-grimnir/neonova-insight/blob/main/README.md
+- User works through the GitHub web interface only — no CLI
+
+## Goal
+Interactive demo of the dashboard, modals, and report. Hosted on GitHub Pages at
+`https://dev-grimnir.github.io/neonova-insight/`. No real RADIUS server contact —
+all customer data synthetic. UI behaves exactly as it does in production because
+it IS production code, with one swapped data-source class.
+
+## Polish target
+Portfolio-quality. Audience: prospective employers, ISP technical peers,
+personal showcase. Demo must work for both technical and non-technical visitors.
+
+## Phase status
+- **Phase 1 — DONE.** GitHub Pages serves the demo branch. `index.html` loads
+  production scripts via `<script>` tags. `.nojekyll` in place.
+- **Phase 2 — DONE.** Synthetic data layer working end-to-end. Encrypted
+  localStorage round-trip working (we KEPT encryption — it's a feature being
+  demonstrated, not friction to bypass). Seeder populates 3 tabs with 17
+  scenario customers including the down-for-hours centerpiece.
+- **Phase 3 — NOT STARTED.** Tooltips, fake phone, About modal.
+- **Phase 4 — NOT STARTED.** Documentation, README updates, screenshots.
+
+## Demo branch file layout
+```
+/                                               (demo branch root)
+├── src/                                        (untouched mirror of main)
+├── demo/
+│   ├── neonova-profile-registry.js             (curated allowlist + behavior profiles)
+│   ├── neonova-http-controller-synthetic.js    (drop-in replacement for prod HTTP)
+│   ├── neonova-demo-seeder.js                  (scenario population via real add flow)
+│   ├── neonova-demo-bootstrap.js               (entry point — mirrors prod userscript)
+│   └── tailwind.css                            (precompiled Tailwind, NOT the Play CDN)
+├── index.html
+├── .nojekyll
+└── (no main.js — production bootstrap is scripts/neonova-dashboard.user.js)
+```
+
+## Architecture as built
+
+### What got swapped vs. preserved
+- **HTTP controller**: REPLACED with synthetic event-stream generator
+  (`demo/neonova-http-controller-synthetic.js`). Deterministic per username via
+  hash-seeded mulberry32 RNG. Time-of-day-weighted exponential disconnect
+  intervals, lognormal outage durations. Stream covers [demoEpoch-30d, +7d].
+  Wall-clock advances; events from the future portion become visible as the
+  session ages, which is how polling stays live.
+- **Crypto controller**: KEPT. Working encrypted localStorage is part of what
+  the demo demonstrates. Returning visitors with the right passphrase resume
+  their session.
+- **Notifier dispatch**: TO BE REPLACED in Phase 3 with fake phone UI.
+- **Everything else** (collector, analyzer, customer model, tab controller,
+  dashboard model/controller, all views): UNTOUCHED. Production code runs as-is.
+
+### Customer add flow
+Memory's "option 4" plan (curated allowlist + deliberate failure affordance)
+is in place. Registry IS the allowlist; failure path comes free from production
+"Account Not Found" handling for unknown usernames. Allowlist UI hints in the
+Add Customer modal are Phase 3 work.
+
+### Walkthrough
+Reverse tooltips on page load with staged choreography — Phase 3 work,
+not started.
+
+### SMS alert demo
+Sticky phone icon, threshold-trip alert, fake SMS bubbles — Phase 3 work,
+not started. The down-for-hours scenario customer (`chodges_mtwash`,
+"Carl Hodges") is already in place to drive this.
+
+### Profile registry catalog (17 customers)
+- Stable Residential: mthompson, akravchenko, dpatel0421, swilliams88,
+  rgarcia2401, wparker0815, sgreenwood, dchen_voip
+- Flaky Residential: jburke7621, lhanson_pgh, bnguyen419, emcfadden, twatkins_rural
+- Stable Business: pacific-st-node-04, bentleyville-tower-7, macgregor-relay,
+  denverton-school-modem
+- Currently Down (centerpiece): chodges_mtwash
+- Just Reconnected: pmoreno1167
+- Recently Replaced: klindstrom_42
+
+### Seeder scenario layout
+- Network tab (active on load): chodges_mtwash + 4 business customers
+- Customers tab: 6 stable residential + 1 flaky + just-reconnected + recently-installed
+- Watchlist tab: 4 flaky residential
+- Seeder skipped if any tab has customers (returning visitors keep their state)
+
+## CSS notes from Phase 2
+- Tailwind Play CDN was unreliable (MutationObserver missed nested innerHTML).
+  We replaced it with a precompiled `tailwind.css` generated from the Tailwind
+  v3.4 compiler with an explicit safelist of every class the production code
+  uses. This file lives at `demo/tailwind.css`.
+- Inline `<style>` block in `index.html` adds two reset rules the production
+  code relies on the host page to provide:
+  - `.neonova-dashboard button { white-space: nowrap; }`
+  - `.neonova-dashboard #header-container > div > div { flex-shrink: 0; }`
+- Panel max-width raised from production's 1100px to 1250px in the demo
+  (`.neonova-dashboard { max-width: 1250px !important; }`) so all header
+  buttons fit without wrapping or overflow.
+- Page background changed to `bg-zinc-700` so the dashboard panel reads as
+  distinctly inset.
+
+## Latent bugs flagged (production TODO, not demo TODO)
+- Dashboard view hardcodes logo URL pointing at old repo name
+  `neonova-post-processor` (renamed to `neonova-insight`). GitHub's redirect
+  for raw URLs is fragile; should be updated to current repo name. Should be
+  fixed on `main` and resynced to `demo`.
+- Production header layout assumes host-page CSS resets (button whitespace,
+  flex-shrink behavior). On a barebones page these are missing and overflow
+  bugs surface. Demo works around in `index.html`; prod should be hardened.
+
+## Phase 3 scope — TO START NEXT
+1. **Reverse tooltips with staged choreography** — appear on page load,
+   dismiss on hover over their element. Header tools first, tab bar second,
+   row controls third. ~4-5 second total choreography. Fire on EVERY page
+   load. Tooltips on initially-hidden elements (modal contents) appear when
+   those elements open.
+2. **Fake phone UI** — sticky icon in corner of dashboard, pulses when alert
+   fires. Click opens phone-shaped modal with stacked SMS bubbles.
+   Threshold-trip on `chodges_mtwash` produces "five-second wow" moment.
+3. **"About this demo" link** — header affordance opens explanatory modal
+   for visitors. Links to production repo.
+
+## Communication notes
+- Hardware mode = design/planning, no code
+- Software mode = code generation OK
+- User holds strong MVC opinions, calls out architectural violations sharply
+- "Dev is where the work gets done and main is the stable baseline"
+- DO NOT ask for files from the repo — assistant should fetch them directly
+  using the URL pattern. Asking burns prompts and wastes time.
+- DO NOT pull `main.js` — there is no main.js. The production bootstrap is
+  `scripts/neonova-dashboard.user.js`.
+- Long conversations degrade assistant accuracy — start fresh between phases.
+
+## Known scope creep risks (still applicable)
+- Demo will surface UI rough edges that prod hides (empty dashboard state,
+  first-run flow, etc.) — these polish opportunities should feed back into
+  prod, not balloon demo scope.
+- Visitor-facing copy/microcopy will need attention in Phase 3 that prod
+  doesn't require.
+
+## Raw URLs (production source paths)
+https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/utils.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/neonova-toast.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-admin-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/log-entry.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-customer-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-admin-manager-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-dashboard-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-tab-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-report-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-snapshot-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-admin-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-admin-manager-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-crypto-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-http-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-progress-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-collector.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-analyzer.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-passphrase-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-customer-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-report-order-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-report-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-snapshot-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-tab-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-add-customer-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-dashboard-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-notifier-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/base-neonova-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-base-modal-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-admin-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-admin-manager-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-inline-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-spinner-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-passphrase-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-customer-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-tab-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-chart.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-order-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-progress-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-add-customer-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-dashboard-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/scripts/neonova-dashboard.user.js
