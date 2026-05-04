@@ -1,0 +1,195 @@
+# Neonova-insight Interactive UI Demo — Memory File
+
+## Project context
+- Repo: github.com/dev-grimnir/neonova-insight
+- Workflow: branch dev → fix one discrete problem → merge to main → delete dev → re-branch
+- The demo is a separate effort, lives on its own branch off main
+- Source pull direction: main → demo, never the reverse
+- File URL pattern: https://raw.githubusercontent.com/dev-grimnir/neonova-insight/{branch}/src/[layer]/[File].js
+- README is at github.com/dev-grimnir/neonova-insight/blob/main/README.md — read this for product framing
+
+## Goal
+Interactive demo of the dashboard, modals, and report. Hosted on GitHub Pages. 
+No real RADIUS server contact — all customer data synthetic. UI must behave exactly as it does in production.
+
+## Polish target
+Portfolio-quality. User has worked on this for months and the demo must reflect that dedication. 
+NOT a quick-and-dirty showcase. Estimated effort: 2 weeks of focused work, scenario design and tooltip choreography included.
+
+## Audience
+All of: prospective employers, ISP technical peers, personal showcase. 
+Demo must work for both technical and non-technical visitors. Walkthrough/discoverability matters.
+
+## Architectural decisions made
+
+### Hosting
+- Separate branch off main (e.g., `demo` or `gh-pages`)
+- One-way sync: main → demo, refresh periodically
+- GitHub Pages serves static files
+- No build step needed — replace @require directives with `<script>` tags in index.html
+- Tailwind already CDN-loaded, fine as-is
+
+### What gets swapped vs. preserved
+- HTTP controller: REPLACED with synthetic data generator
+- Encrypted blob persistence: REMOVED entirely (in-memory only)
+- Notifier dispatch: REPLACED with fake phone UI
+- Everything above the data layer (models, controllers, views) stays identical
+
+### Persistence: in-memory only
+Decided against keeping encryption layer in demo. Reasons:
+- Refresh wipes state, predictable for visitors
+- One visitor's actions don't pollute another's experience
+- No leftover state on shared computers
+- Lowest friction for a "look at this" demo
+
+### Customer add flow: option 4 (curated allowlist + deliberate failure affordance)
+- Synthetic backend has ~20 fictional valid usernames
+- Add Customer modal shows "Demo customers available" hint with clickable chips
+- Separate "Try entering a bad name" link below input pre-fills with unavailable name
+- Both success and failure paths discoverable, signposted in modal
+- Reverse-tooltip on the modal calls out both affordances
+
+### Walkthrough: reverse tooltips (user's idea, locked in)
+- Tooltips appear on page load, dismiss on hover over their element
+- Self-clearing UI hints — no interruption of user intent
+- Staged appearance: header tools first, tab bar second, row controls third
+- Total choreography ~4-5 seconds
+- Fire on EVERY page load, not first-time-only (visitors are usually first-time)
+- Tooltips on initially-hidden elements (modal contents, etc) appear when those elements open
+
+### SMS alert demo: fake phone UI
+- Sticky phone icon in corner of dashboard, pulses when alert fires
+- Click opens phone-shaped modal with stacked SMS bubbles
+- Pre-loaded scenario state includes one customer "currently down for hours"
+- Within seconds of demo load, threshold trips, alert fires, phone lights up
+- "Five-second wow" moment
+
+### Reports
+- Synthetic data generation deterministic per (customerId, dateRange)
+- Hash-based RNG seed — same params always yield same events
+- Progress modal stays in flow but with shorter latency (3s vs 30s)
+
+### Customer profile model
+User confirmed: weight-based, simple to author. Dimensions:
+- Reliability (avg disconnects/day) — 0.05 to 25.0
+- Outage duration distribution (skewed lognormal — short blips with rare longer outages)
+- Time-of-day weighting (residential clusters at night/weekends, commercial at business hours)
+- Current state at "now" (up, down, recently-reconnected)
+
+Profile flavors to author:
+- Stable Residential
+- Flaky Residential
+- Stable Business
+- Currently Down
+- Just Reconnected
+- Recently Replaced
+
+### Pre-loaded scenario state at demo init
+- 3 tabs minimum (Network, Customers, plus one for variety)
+- Network tab is active on load (more interesting visually)
+- 8-12 synthetic customers across tabs
+- Realistic infrastructure names (Pacific St Node 4, Bentleyville-7, MacGregor Tower)
+- Realistic-sounding subscriber names (no real people)
+- At least ONE customer in "currently down past threshold" state with disconnectedSince stamped
+- 2-3 fake admins pre-populated in admin manager
+- Network tab's down customer at top of row list
+
+## Phase plan
+
+### Phase 1 — static shell
+- Demo branch exists
+- GitHub Pages configured
+- Production JS loads on plain HTML page via <script> tags
+- No synthetic data, no functionality
+- Goal: verify deploy pipeline, no userscript wrapper
+
+### Phase 2 — synthetic data layer
+- Replace HTTP controller with synthetic generator
+- Define customer profiles
+- Pre-baked scenario state
+- Poll loop produces synthetic events live
+- Dashboard runs on synthetic data identically to production
+- No tooltips, no fake phone yet
+
+### Phase 3 — polish layer
+- Reverse tooltips with staged choreography
+- Fake phone with SMS bubbles
+- Down-customer scenario triggers visible alert within seconds
+- "About this demo" link in header
+
+### Phase 4 — documentation
+- README updates
+- Screenshots / GIFs
+- Possibly short demo video
+- Cross-links between demo and production repo
+
+## Things deliberately left flexible
+- Whether tooltips stage in or all-at-once: stage in (decided)
+- Whether reports get full progress modal or skip: full but faster (decided)
+- Whether to mock notifier with toast or fake phone: fake phone (decided)
+- Whether to keep encryption: drop it (decided)
+- Whether customers can be added with arbitrary names: no, allowlist (decided)
+- Whether per-row friendly name editing works: yes, in-memory mutation (decided)
+
+## Known scope creep risks
+- Demo will surface UI rough edges that prod hides (empty dashboard state, first-run flow, etc.)
+- These polish opportunities should feed back into prod, not balloon demo scope
+- Visitor-facing copy/microcopy will need attention that prod doesn't require
+
+## Current status
+NOT STARTED. Demo work blocked behind closing the production TODO. 
+As of last session, TODO went from 12 items to 1 (snapshot tooltip residual question or whatever's left). Once that closes, demo work can begin.
+
+## User communication notes
+- Hardware mode = design/planning, no code
+- Software mode = code generation OK
+- User holds strong MVC opinions, calls out architectural violations sharply
+- "Dev is where the work gets done and main is the stable baseline"
+- User has all @require URLs in the entry script — assistant should NOT keep asking for URLs that follow the known pattern
+- Long conversations degrade assistant accuracy — start fresh when warranted
+
+## Raw URLs
+https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/utils.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/neonova-toast.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-admin-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/log-entry.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-customer-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-admin-manager-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-dashboard-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-tab-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-report-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-snapshot-model.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-admin-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-admin-manager-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-crypto-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-http-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-progress-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-collector.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-analyzer.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-passphrase-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-customer-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-report-order-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-report-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-snapshot-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-tab-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-add-customer-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-dashboard-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-notifier-controller.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/base-neonova-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-base-modal-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-admin-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-admin-manager-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-inline-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-spinner-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-passphrase-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-customer-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-tab-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-chart.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-order-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-progress-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-add-customer-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-dashboard-view.js
