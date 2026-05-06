@@ -33,7 +33,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
         const interval = this.controller.model.pollingIntervalMinutes;
     
         return `
-            <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900 shrink-0 relative z-10">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900 shrink-0 relative z-10 dashboard-header">
                 <div class="flex items-center gap-4">
                     <img src="https://raw.githubusercontent.com/dev-grimnir/neonova-post-processor/main/src/assets/nova-subscriber-logo.png" 
                          alt="Nova Subscriber" class="h-10 w-auto">
