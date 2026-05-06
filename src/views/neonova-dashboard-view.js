@@ -333,6 +333,36 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 }
                 .neonova-tab-btn.drop-before::before { left: -2px; }
                 .neonova-tab-btn.drop-after::after { right: -2px; }
+
+                /* Drag-and-drop reorder */
+                .neonova-tab-btn[draggable="true"] {
+                    cursor: grab;
+                }
+
+                /* Mode toggle icon (sort vs manual) */
+                .neonova-tab-btn .tab-mode-toggle {
+                    margin-right: 6px;
+                    cursor: pointer;
+                    color: #a1a1aa;
+                    display: inline-flex;
+                    align-items: center;
+                    vertical-align: middle;
+                    font-size: 13px;
+                    line-height: 1;
+                    transition: color 150ms;
+                    user-select: none;
+                }
+                .neonova-tab-btn .tab-mode-toggle:hover {
+                    color: #34d399;
+                }
+
+                /* Customer-drop target (whole tab highlights, not just a side bar) */
+                .neonova-tab-btn.customer-drop-target {
+                    background: #134e4a !important;
+                    border-color: #34d399 !important;
+                    color: #e4e4e7 !important;
+                }
+                
             `;
             document.head.appendChild(style);
         }
@@ -362,7 +392,15 @@ class NeonovaDashboardView extends BaseNeonovaView {
             this.toggleMinimize();
         };
         document.addEventListener('click', this.outsideListener);
-    
+
+        // Clear any stuck customer-drop-target highlights when a drag ends
+        // anywhere — covers aborts (Esc, drop on nothing, drag out of window).
+        document.addEventListener('dragend', () => {
+            this.tabBar?.querySelectorAll('.customer-drop-target').forEach(b => {
+                b.classList.remove('customer-drop-target');
+            });
+        });
+        
         window.addEventListener('resize', () => {
             if (this.isMinimized) this.applyMinimizedStyles();
         });
@@ -383,13 +421,19 @@ class NeonovaDashboardView extends BaseNeonovaView {
             btn.dataset.index = String(idx);
             btn.draggable = true;
             const { connected, disconnected } = tab.getConnectionCounts();
-    
+
             const bellColor = tab.isNetworkTab ? '#34d399' : '#52525b';
             const bellTitle = tab.isNetworkTab
                 ? 'Notifications ON for this tab (click to disable)'
                 : 'Notifications OFF for this tab (click to enable)';
-    
+
+            const modeGlyph = tab.manualOrder ? '⋮⋮' : '⇅';
+            const modeTitle = tab.manualOrder
+                ? 'Manual order (click to switch to auto-sort by status)'
+                : 'Auto-sort by status (click to switch to manual order)';
+
             btn.innerHTML = `
+                <span class="tab-mode-toggle" title="${modeTitle}">${modeGlyph}</span>
                 <span class="tab-bell"
                       title="${bellTitle}"
                       style="margin-right:6px; cursor:pointer; color:${bellColor}; display:inline-flex; align-items:center; vertical-align:middle;">
@@ -404,7 +448,13 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 </span>
                 <span class="tab-close" title="Close tab">&times;</span>
             `;
-    
+
+            btn.querySelector('.tab-mode-toggle').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.controller.getTabController().toggleTabMode(tab.label);
+                this.renderTabBar();
+            });
+
             btn.querySelector('.tab-bell').addEventListener('click', async (e) => {
                 e.stopPropagation();
                 await this.controller.getTabController().toggleNetworkTab(tab.label);
@@ -414,12 +464,12 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 }
                 this.controller.getTabController().rebuildTable();
             });
-    
+
             btn.querySelector('.tab-label').addEventListener('click', () => {
                 this.controller.getTabController().switchTab(tab.label);
                 this.renderTabBar();
             });
-    
+
             btn.querySelector('.tab-close').addEventListener('click', (e) => {
                 e.stopPropagation();
                 const confirmed = confirm(`Close tab "${tab.label}"?`);
@@ -428,7 +478,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     this.renderTabBar();
                 }
             });
-    
+
             btn.querySelector('.tab-label').addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 const newLabel = prompt('Rename tab:', tab.label);
@@ -437,22 +487,26 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     this.renderTabBar();
                 }
             });
-    
-            // ─── Drag-and-drop reorder ───────────────────────────────
+
+            // ─── Tab reorder (drag a tab to reposition it) ──────────
             btn.addEventListener('dragstart', (e) => {
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', String(idx));
                 btn.classList.add('dragging');
             });
-    
+
             btn.addEventListener('dragend', () => {
                 btn.classList.remove('dragging');
                 this.tabBar.querySelectorAll('.neonova-tab-btn').forEach(b => {
                     b.classList.remove('drop-before', 'drop-after');
                 });
             });
-    
+
             btn.addEventListener('dragover', (e) => {
+                // Customer drag: handled by the customer-drop block below
+                if (e.dataTransfer.types.includes('application/x-neonova-customer')) return;
+                // Tab reorder: only react to our own MIME type
+                if (!e.dataTransfer.types.includes('text/plain')) return;
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 const rect = btn.getBoundingClientRect();
@@ -460,26 +514,53 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 btn.classList.toggle('drop-before', isLeftHalf);
                 btn.classList.toggle('drop-after', !isLeftHalf);
             });
-    
+
             btn.addEventListener('dragleave', () => {
                 btn.classList.remove('drop-before', 'drop-after');
             });
-    
+
             btn.addEventListener('drop', (e) => {
+                // Customer drag: handled by the customer-drop block below
+                if (e.dataTransfer.types.includes('application/x-neonova-customer')) return;
                 e.preventDefault();
                 const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
                 if (Number.isNaN(fromIdx)) return;
-    
+
                 const rect = btn.getBoundingClientRect();
                 const isLeftHalf = e.clientX < rect.left + rect.width / 2;
                 let toIdx = idx + (isLeftHalf ? 0 : 1);
-                // Account for the index shift after splicing out fromIdx
                 if (fromIdx < toIdx) toIdx--;
-    
+
                 btn.classList.remove('drop-before', 'drop-after');
                 this.controller.getTabController().reorderTab(fromIdx, toIdx);
             });
-    
+
+            // ─── Customer-drop target (cross-tab move) ──────────────
+            btn.addEventListener('dragover', (e) => {
+                if (!e.dataTransfer.types.includes('application/x-neonova-customer')) return;
+                // Active tab is handled by the tbody's drop zone
+                if (tab.isActive) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                btn.classList.add('customer-drop-target');
+            });
+
+            btn.addEventListener('dragleave', (e) => {
+                if (!e.dataTransfer.types.includes('application/x-neonova-customer')) return;
+                btn.classList.remove('customer-drop-target');
+            });
+
+            btn.addEventListener('drop', (e) => {
+                if (!e.dataTransfer.types.includes('application/x-neonova-customer')) return;
+                if (tab.isActive) return;
+                e.preventDefault();
+                e.stopPropagation();
+                btn.classList.remove('customer-drop-target');
+                const username = e.dataTransfer.getData('application/x-neonova-customer');
+                if (!username) return;
+                this.controller.getTabController().moveCustomerToTab(username, tab.label);
+            });
+
             this.tabBar.appendChild(btn);
         });
     
