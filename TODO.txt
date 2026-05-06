@@ -1,2 +1,3 @@
+Snapshots fill out the rest of the day, under certain conditions.  They should only build to the time requested, if building a current day snapshot.  
 "account not found" badges should be addressed.
 geolocating customers and building a map of which customers are fed out of which remote.
