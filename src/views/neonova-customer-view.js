@@ -6,12 +6,59 @@ class NeonovaCustomerView extends BaseNeonovaView {
     constructor(controller) {
         super();
         this.#controller = controller;
-
+    
         this.#tr = document.createElement('tr');
         this.#tr.className = 'hover:bg-gray-800/50 transition-colors duration-100';
-
+        this.#tr.draggable = true;
+        this.#tr.dataset.username = controller.radiusUsername;
+    
         this.#renderContent();
         this.#attachListeners();
+        this.#attachDragListeners();
+
+        if (!document.getElementById('neonova-drag-handle-style')) {
+            const style = document.createElement('style');
+            style.id = 'neonova-drag-handle-style';
+            style.textContent = `
+                .drag-handle {
+                    display: inline-block;
+                    color: #52525b;
+                    cursor: grab;
+                    user-select: none;
+                    margin-right: 8px;
+                    font-size: 14px;
+                    line-height: 1;
+                    transition: color 150ms;
+                }
+                .drag-handle:hover {
+                    color: #34d399;
+                }
+                .drag-handle:active {
+                    cursor: grabbing;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    #attachDragListeners() {
+        this.#tr.addEventListener('dragstart', (e) => {
+            if (this.#isEditing) {
+                e.preventDefault();
+                return;
+            }
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('application/x-neonova-customer', this.#controller.radiusUsername);
+            this.#tr.classList.add('neonova-row-dragging');
+            const tabCtrl = this.#controller.dashboardController?.getTabController?.();
+            tabCtrl?.beginDrag();
+        });
+    
+        this.#tr.addEventListener('dragend', () => {
+            this.#tr.classList.remove('neonova-row-dragging');
+            const tabCtrl = this.#controller.dashboardController?.getTabController?.();
+            tabCtrl?.endDrag();
+        });
     }
 
     getElement() {
@@ -74,6 +121,7 @@ class NeonovaCustomerView extends BaseNeonovaView {
 
         this.#tr.innerHTML = `
             <td class="px-2 py-1 text-sm text-gray-200 whitespace-nowrap">
+                <span class="drag-handle" title="Drag to reorder or move to another tab">⋮⋮</span>
                 <span class="friendly-name cursor-pointer select-none" title="Click to edit name">
                     ${cust.friendlyName || cust.radiusUsername}
                 </span>
