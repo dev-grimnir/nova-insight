@@ -7,6 +7,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
         { key: 'snapshot',     label: '24 Hr Snapshot',        width: 28, align: 'left'  },
         { key: 'action',       label: 'Action',          width: 12, align: 'right' }
         ];
+    
     constructor(controller) {
         super();
         this.controller = controller;
