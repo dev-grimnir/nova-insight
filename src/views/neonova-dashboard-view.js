@@ -233,10 +233,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     bottom: -8px !important;
                     transform: rotate(225deg) !important;
                 }
-                .neonova-dashboard.minimized .group\\/polling:hover .poll-slider-tooltip,
-                .neonova-dashboard.minimized .poll-slider-tooltip:hover {
-                    display: block !important;
-                }
+
                 .neonova-tab-btn {
                     padding: 6px 18px;
                     border-radius: 12px 12px 0 0;
