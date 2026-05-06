@@ -236,11 +236,16 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     margin-top: 0 !important;
                     margin-bottom: 12px !important;
                 }
+                
                 .neonova-dashboard.minimized .poll-slider-tooltip > div:last-child {
                     top: auto !important;
                     bottom: -8px !important;
                     transform: rotate(225deg) !important;
                 }
+                
+                .poll-slider-tooltip {
+                        transition: opacity 250ms ease !important;
+                    }
     
                 /* Tabs */
                 .neonova-tab-btn {
@@ -564,6 +569,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
         this.panel.style.borderRadius = '24px 24px 0 0';
         this.panel.style.boxShadow = '0 -12px 40px rgba(0,0,0,0.8)';
         this.panel.style.cursor = 'pointer';
+        this.panel.style.overflow = 'visible';
         this.panel.classList.add('minimized');
     }
 
@@ -576,6 +582,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
         this.panel.style.borderRadius = '24px';
         this.panel.style.boxShadow = '0 8px 40px rgba(0,0,0,0.8)';
         this.panel.style.cursor = 'default';
+        this.panel.style.overflow = 'hidden';
         this.panel.classList.remove('minimized');
     }
 
