@@ -301,7 +301,6 @@ class NeonovaTabController {
     async load() {
         const data = localStorage.getItem('novaDashboardTabs');
         if (!data) {
-            await this.#migrateFromLegacy();
             return;
         }
         try {
