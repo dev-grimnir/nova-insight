@@ -234,6 +234,11 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     bottom: -8px !important;
                     transform: rotate(225deg) !important;
                 }
+                .neonova-dashboard.minimized .poll-slider-tooltip {
+                    padding-top: 0 !important;
+                    padding-bottom: 12px !important;
+                    margin-bottom: 0 !important;
+                }
     
                 /* Privacy mode blur */
                 .neonova-privacy-mode td:nth-child(1),
