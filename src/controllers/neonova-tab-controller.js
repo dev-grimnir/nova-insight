@@ -5,6 +5,16 @@ class NeonovaTabController {
         this.tabs = [];
     }
 
+    async reorderTab(fromIdx, toIdx) {
+        if (fromIdx < 0 || toIdx < 0) return;
+        if (fromIdx >= this.tabs.length || toIdx >= this.tabs.length) return;
+        if (fromIdx === toIdx) return;
+        const [moved] = this.tabs.splice(fromIdx, 1);
+        this.tabs.splice(toIdx, 0, moved);
+        await this.save();
+        this.dashboardController.view.renderTabBar();
+    }
+
     //methods from dashboard controller
     createCustomerController(customer) {
         const ctrl = new NeonovaCustomerController(this.dashboardController, trimmed, friendlyName);
