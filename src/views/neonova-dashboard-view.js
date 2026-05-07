@@ -532,7 +532,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 this.controller.getTabController().rebuildTable();
             });
 
-            btn.querySelector('.tab-label').addEventListener('click', () => {
+            btn.addEventListener('click', () => {
                 this.controller.getTabController().switchTab(tab.label);
                 this.renderTabBar();
             });
