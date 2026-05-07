@@ -43,6 +43,7 @@ class NeonovaTabController {
     
         this.view.setRows(rows);
         this.dashboardController.view.renderTabBar();
+        this.dashboardController.view.renderTableHeader();
     }
 
     #getDisplayOrder(tab) {
@@ -371,6 +372,8 @@ class NeonovaTabController {
     
         tab.setCustomerOrder(order);
         tab.manualOrder = true;
+        tab.sortColumn = null;
+        tab.sortDirection = null;
     
         await this.save();
         this.rebuildTable();
@@ -419,7 +422,75 @@ class NeonovaTabController {
             tab.manualOrder = true;
         }
     
+        tab.sortColumn = null;
+        tab.sortDirection = null;
+    
         await this.save();
         this.rebuildTable();
+    
+    }
+
+    // Sort the tab's customers by a column, toggling direction if same column,
+    // or starting at ascending if a new column. Writes through to manual mode.
+    async sortByColumn(label, columnKey) {
+        const tab = this.tabs.find(t => t.label === label);
+        if (!tab) return;
+
+        const direction = (tab.sortColumn === columnKey && tab.sortDirection === 'asc')
+            ? 'desc'
+            : 'asc';
+
+        const sorted = [...tab.customers].sort(this.#getColumnComparator(columnKey, direction));
+
+        tab.setCustomerOrder(sorted);
+        tab.manualOrder = true;
+        tab.sortColumn = columnKey;
+        tab.sortDirection = direction;
+
+        await this.save();
+        this.rebuildTable();
+    }
+
+    #getColumnComparator(columnKey, direction) {
+        const flip = direction === 'desc' ? -1 : 1;
+
+        switch (columnKey) {
+            case 'friendlyName':
+                return (a, b) => {
+                    const aName = a.model?.friendlyName || a.model?.radiusUsername || '';
+                    const bName = b.model?.friendlyName || b.model?.radiusUsername || '';
+                    return aName.localeCompare(bName) * flip;
+                };
+
+            case 'radiusUser':
+                return (a, b) => {
+                    const aName = a.model?.radiusUsername || '';
+                    const bName = b.model?.radiusUsername || '';
+                    return aName.localeCompare(bName) * flip;
+                };
+
+            case 'status':
+                return (a, b) => {
+                    const aStatus = a.model?.status || '';
+                    const bStatus = b.model?.status || '';
+                    const aDisconnected = aStatus !== 'Connected' && aStatus !== 'Connecting...';
+                    const bDisconnected = bStatus !== 'Connected' && bStatus !== 'Connecting...';
+
+                    if (aDisconnected !== bDisconnected) {
+                        return (aDisconnected ? 1 : -1) * flip;
+                    }
+                    return (a.model?.durationSec || 0) - (b.model?.durationSec || 0);
+                };
+
+            case 'duration':
+                return (a, b) => {
+                    const aDur = a.model?.durationSec || 0;
+                    const bDur = b.model?.durationSec || 0;
+                    return (aDur - bDur) * flip;
+                };
+
+            default:
+                return () => 0;
+        }
     }
 }
