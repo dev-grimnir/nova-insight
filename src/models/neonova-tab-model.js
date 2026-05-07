@@ -1,9 +1,11 @@
 class NeonovaTabModel {
-    constructor(label, isActive = false, isNetworkTab = false, manualOrder = false) {
+    constructor(label, isActive = false, isNetworkTab = false, manualOrder = false, sortColumn = null, sortDirection = null) {
         this.label = label;
         this.isActive = isActive;
         this.isNetworkTab = isNetworkTab;
         this.manualOrder = manualOrder;
+        this.sortColumn = sortColumn;
+        this.sortDirection = sortDirection;
         this.customers = [];
     }
 
@@ -17,8 +19,6 @@ class NeonovaTabModel {
         this.customers = this.customers.filter(c => c.radiusUsername !== radiusUsername);
     }
 
-    // Replace the customer order wholesale. Caller guarantees the new array
-    // contains the same set of customer controllers, just in a different order.
     setCustomerOrder(orderedCustomers) {
         if (!Array.isArray(orderedCustomers)) return;
         if (orderedCustomers.length !== this.customers.length) return;
@@ -45,6 +45,8 @@ class NeonovaTabModel {
             isActive: this.isActive,
             isNetworkTab: this.isNetworkTab,
             manualOrder: this.manualOrder,
+            sortColumn: this.sortColumn,
+            sortDirection: this.sortDirection,
             customers: this.customers.map(c => c.model.toJSON())
         };
     }
@@ -54,7 +56,9 @@ class NeonovaTabModel {
             json.label,
             json.isActive,
             json.isNetworkTab === true,
-            json.manualOrder === true
+            json.manualOrder === true,
+            json.sortColumn ?? null,
+            json.sortDirection ?? null
         );
         tab.customers = json.customers.map(c => {
             const model = NeonovaCustomerModel.fromJSON(c);

@@ -313,30 +313,6 @@ class NeonovaTabController {
             this.initDefaultTab();
         }
     }
-    /*
-    async #migrateFromLegacy() {
-        const legacy = localStorage.getItem('novaDashboardCustomers');
-        if (!legacy) {
-            this.initDefaultTab();
-            return;
-        }
-        try {
-            const jsonStr = await NeonovaCryptoController.decryptData(legacy);
-            const parsed = JSON.parse(jsonStr);
-            const defaultTab = new NeonovaTabModel('Customers', true);
-            for (const json of parsed.customers || []) {
-                const ctrl = NeonovaCustomerController.fromJSON(json, this.dashboardController);
-                defaultTab.addCustomer(ctrl);
-            }
-            this.tabs.push(defaultTab);
-            await this.save();
-            this.view.render();
-        } catch (e) {
-            console.error('[NeonovaTabController.migrateFromLegacy]', e);
-            this.initDefaultTab();
-        }
-    }
-    */
 
     // ====================== DRAG-AND-DROP ======================
     beginDrag() {
@@ -365,8 +341,6 @@ class NeonovaTabController {
         if (toDisplayIdx < 0 || toDisplayIdx > order.length) return;
     
         const [moved] = order.splice(fromDisplayIdx, 1);
-        // toDisplayIdx is the slot index *before* the splice. Adjust if the
-        // destination was past the source, since splicing shifted things left.
         const insertAt = toDisplayIdx > fromDisplayIdx ? toDisplayIdx - 1 : toDisplayIdx;
         order.splice(insertAt, 0, moved);
     
