@@ -1,7 +1,7 @@
 class NeonovaDashboardView extends BaseNeonovaView {
     static COLUMNS = [
         { key: 'friendlyName', label: 'Friendly Name',   width: 18, align: 'left'  },
-        { key: 'radiusUser',   label: 'RADIUS Username', width: 18, align: 'left'  },
+        { key: 'radiusUser',   label: 'RADIUS UN', width: 18, align: 'left'  },
         { key: 'status',       label: 'Status',          width: 10, align: 'left'  },
         { key: 'duration',     label: 'Duration',        width: 14, align: 'left'  },
         { key: 'snapshot',     label: '24 Hr Snapshot',        width: 28, align: 'left'  },
