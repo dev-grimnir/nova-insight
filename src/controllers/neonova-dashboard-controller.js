@@ -241,9 +241,19 @@ class NeonovaDashboardController {
                 if (latest) break;   // Found something — stop widening
             }
 
-            // No logs at all (even after 30 days) → safe default
+            // No logs found in any lookback window
             if (!latest) {
-                customer.update('Account Not Found', 0);
+                if (customer.lastEventTime !== null) {
+                    // Known existing customer — preserve status, just increment duration
+                    const eventDate = new Date(customer.lastEventTime);
+                    if (!isNaN(eventDate.getTime())) {
+                        const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
+                        if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
+                    }
+                } else {
+                    // Never-seen customer — appropriate to mark as not found
+                    customer.update('Account Not Found', 0);
+                }
                 return;
             }
 
