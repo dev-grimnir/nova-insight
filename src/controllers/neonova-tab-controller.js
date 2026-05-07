@@ -392,6 +392,13 @@ class NeonovaTabController {
     
         const ctrl = sourceTab.customers.find(c => c.radiusUsername === radiusUsername);
         if (!ctrl) return;
+
+        // Duplicate check — target tab can't already have this customer
+        if (targetTab.customers.some(c => c.radiusUsername === radiusUsername)) {
+            const label = ctrl.friendlyName || ctrl.radiusUsername;
+            NeonovaToast.error(`"${label}" is already in "${targetLabel}"`);
+            return;
+        }
     
         sourceTab.removeCustomer(radiusUsername);
         targetTab.addCustomer(ctrl);
