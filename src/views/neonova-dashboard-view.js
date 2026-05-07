@@ -427,7 +427,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 ? 'Notifications ON for this tab (click to disable)'
                 : 'Notifications OFF for this tab (click to enable)';
 
-            const modeGlyph = tab.manualOrder ? '⋮⋮' : '⇅';
+            const modeGlyph = tab.manualOrder ? '☰' : '⇅';
             const modeTitle = tab.manualOrder
                 ? 'Manual order (click to switch to auto-sort by status)'
                 : 'Auto-sort by status (click to switch to manual order)';
