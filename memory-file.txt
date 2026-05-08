@@ -10,106 +10,165 @@
 ## Demo phase status
 - Phase 1 (deploy pipeline): DONE
 - Phase 2 (synthetic data, encrypted localStorage round-trip, seeder): DONE
-- Phase 3 status:
-  - About-as-background: DONE (header above panel + section below, both in index.html)
-  - Account list box: DONE (demo/neonova-account-list-box.js, hooks Add Customer modal via MutationObserver)
-  - Reverse tooltips: DEFERRED pending real-user UI feedback
-  - Fake phone UI: DEFERRED until Twilio campaign approval
-  - Phase 3 functionally closed in current form
+- Phase 3 (about-as-background, account list box): DONE; tooltips and fake phone DEFERRED. Phase 3 functionally closed.
 
 ## Recent main-branch work (this conversation)
 
-### Customer row drag-and-drop (within and across tabs)
-Two-state sort model on tabs: `manualOrder = false` (auto-sort) or `manualOrder = true` (user-arranged).
+### Account Not Found bug fix
+**File:** `src/controllers/neonova-dashboard-controller.js`, `updateCustomerStatus` method.
 
-**Tab model additions:**
-- `manualOrder: boolean` (default false)
-- `sortColumn: string | null` (default null)
-- `sortDirection: 'asc' | 'desc' | null` (default null)
-- `setCustomerOrder(orderedCustomers)` — replaces array wholesale, length-checked
-- All three new fields persist via toJSON/fromJSON; existing saves without them default cleanly
+**Bug:** Long-idle customers (no Start/Stop events in any lookback window up to 335 days) were being stamped 'Account Not Found' on every poll, overwriting their real Connected status. Took a status flip OR remove-and-readd to fix. The buggy block was:
 
-**Tab controller additions:**
-- `dragInProgress` flag — `rebuildTable()` bails while set, prevents poll-mid-drag teardown
-- `beginDrag()` / `endDrag()` — set/clear flag
-- `#getDisplayOrder(tab)` — single source of truth for display ordering. Manual returns array as-is; auto sorts disconnected-first then ascending duration. All paths read from model, no textContent sniffing.
-- `reorderCustomer(fromDisplayIdx, toDisplayIdx)` — within-tab; flips to manual; clears column state
-- `moveCustomerToTab(radiusUsername, targetLabel)` — cross-tab; mode untouched on either side; appends to destination's customers array; toasts "already in target" on duplicate via NeonovaToast.error
-- `toggleTabMode(label)` — flips manualOrder; on auto→manual freezes current display order as new array order; clears column state
-- `#parseDurationToSeconds` is now dead (commented out); old textContent-sniffing sort retired
+    if (!latest) {
+        customer.update('Account Not Found', 0);
+        return;
+    }
 
-**Customer view additions:**
-- `<tr draggable="true">`, `tr.dataset.username` set in constructor
-- Drag handle (`⋮⋮`, U+2807) prepended to friendly-name cell as `<span class="drag-handle">`
-- `dragstart` writes `application/x-neonova-customer` MIME with username, calls `tabCtrl.beginDrag()`, applies `neonova-row-dragging` class
-- `dragend` cleans class and calls `endDrag()`
-- Drag preempted if `#isEditing` (mid-rename)
-- Inline `<style>` block injects `.drag-handle` styles (zinc-600 → emerald-400 on hover, cursor grab/grabbing)
+**Fix:** Guard on `customer.lastEventTime` first. Known existing customers preserve status and bump duration; only never-seen customers get stamped 'Account Not Found':
 
-**Tab view additions:**
-- `dropIndicator` floating div (`position: fixed`, 3px emerald bar) appended to body, single instance
-- `#injectStyles()` adds `.neonova-row-drop-indicator` and `tr.neonova-row-dragging` (opacity 0.4 + scale 1.02)
-- `#handleDragOver` walks rows by `getBoundingClientRect()`, computes drop-above/below from midpoint, sets `lastDropTargetIdx`, positions indicator
-- `#handleDrop` reads username from dataTransfer, finds source row index by walking tbody for matching `dataset.username`, calls `reorderCustomer`
-- All handlers gated on `application/x-neonova-customer` MIME so other drags don't trigger
-- Document-level `dragend` on tab view as cleanup catch-all for aborts
+    if (!latest) {
+        if (customer.lastEventTime !== null) {
+            const eventDate = new Date(customer.lastEventTime);
+            if (!isNaN(eventDate.getTime())) {
+                const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
+                if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
+            }
+        } else {
+            customer.update('Account Not Found', 0);
+        }
+        return;
+    }
 
-**Dashboard view (tab bar) additions:**
-- Tab button layout: `[mode][bell][label][counts][×]`
-- Mode glyph: `⇅` (auto) / `☰` (manual) — `☰` chosen over `⋮⋮` to avoid collision with row drag handle
-- `.tab-mode-toggle` click → `toggleTabMode`, `stopPropagation()` so it doesn't switch tabs
-- Each tab button gets BOTH a tab-reorder DnD listener set AND a customer-drop listener set, gated by `dataTransfer.types`. Tab reorder uses `text/plain`; customer drop uses `application/x-neonova-customer`. Source-order matters less than the type guards.
-- `.customer-drop-target` class highlights destination tab teal (`#134e4a` background, emerald border) on customer-drag hover
-- Active tab guards (`if (tab.isActive) return`) prevent treating active tab as a customer-drop target — tbody handles within-tab drops
-- Document-level `dragend` cleans stuck `customer-drop-target` highlights
-- `moveCustomerToTab` source-tab discovery uses `getActiveTab()` directly. Earlier "find first tab containing customer" version was buggy when the customer existed in multiple tabs — sourceTab could resolve to the destination, sourceTab===targetTab bailed silently before the duplicate check ran.
+**Architectural note (deferred):** The buffer-update block now ingests events into `customer.eventHistory` BEFORE the status-pill logic runs. The status-pill is doing redundant HTTP via `getLatestEntry` that overlaps the buffer's data. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching. Bigger reshape, separate cycle.
 
-### Color refresh (gray → emerald, single dev cycle)
-- Tab-bar bottom border: `#zinc-800` → `#34d399` (inline style on the `#tab-bar` div, NOT a Tailwind utility class, since Tailwind availability isn't guaranteed on host pages)
-- Tab borders (inactive AND active): `#3f3f46` → `#34d399`
-- Active tab fill: transparent → `#047857` (emerald-700)
-- Active tab text: `#34d399` → `#ffffff` (for contrast against emerald-700 fill)
-- Active tab keeps `border-bottom: none` (sits on the rail; the emerald rail draws across the active tab's bottom — "glowing rail" look)
-- Tab close `×`: 11px → 14px, gray → white, always visible (removed `opacity: 0` / hover-fade), `:hover` brightens to red `#ef4444`
-- Consolidated the two redundant `.neonova-tab-btn` rule blocks into one
-- `.neonova-tab-add` `+` button left alone (already had `#52525b → #34d399` on hover)
+### Tab dead-zone bug fix
+**File:** `src/views/neonova-dashboard-view.js`, `renderTabBar` method.
 
-### Column-sort UI
-Two-state model preserved — clicking a column header is just another way to enter manual mode. Column state is metadata about *most recent sort action*, not a live mode declaration.
+**Bug:** Clicking the lower half (or any padding/non-text area) of an inactive tab did nothing. Tab-switch handler was attached to `.tab-label` span only. Padding, counts span, and any non-text pixels of the button were dead.
 
-**Behavior:**
-- Sortable columns: Friendly Name, RADIUS Username, Status, Duration. Snapshot and Action: not sortable.
-- Default glyph on every sortable column: `⇅` (same as tab auto-sort glyph — self-consistent vocabulary, "this can be sorted")
-- Click sets that column's glyph to `↑` (ascending), all others revert to `⇅`. Click same column again: flips to `↓`. Click different column: previous reverts to `⇅`, new one shows `↑`.
-- Clicking writes the sort through to the customers array and sets `manualOrder = true`. Tab glyph flips to `☰`.
-- Reset paths (clear `sortColumn` and `sortDirection`):
-  - Drag-reorder within tab
-  - Tab mode toggle via tab icon (manual ↔ auto)
-  - Cross-tab move and add-customer DON'T clear (cross-tab doesn't change source order; add-customer just appends to bottom and lets the next sort gather it)
-- Each tab carries its own column state — switching tabs doesn't clear
+**Fix:** Move the click handler from `.tab-label` to the button itself. Inner glyphs (mode, bell, close) already call `stopPropagation()`, so they're safe. Counts span (no handler) now bubbles to button → switches tab.
 
-**Sort comparators (`#getColumnComparator`):**
-- friendlyName: `localeCompare` on `friendlyName || radiusUsername` (sort by what's displayed)
-- radiusUser: `localeCompare` on `radiusUsername`
-- status: status group primary (Connected/Connecting at top for asc, Disconnected/Error/Unknown at top for desc), `durationSec` ascending as tiebreaker (NOT flipped by direction — same as auto-sort tiebreaker)
-- duration: numeric `durationSec`
+    btn.addEventListener('click', () => {
+        this.controller.getTabController().switchTab(tab.label);
+        this.renderTabBar();
+    });
 
-**Implementation notes:**
-- `buildTheadHTML(activeTab = null)` is parameterized — pure function of (columns, activeTab) → HTML. Defaults to ⇅ everywhere when no activeTab (initial render before `controller.load()` resolves). Static method.
-- `renderTableHeader()` instance method finds `#content-area thead` and replaces it via `replaceWith()` on every `rebuildTable()` call. The `#content-area thead` selector is sufficient; the earlier comma-selector with `#header-container ~ #content-area` was overcomplicated.
-- Click handling uses **event delegation** on `#content-area`, attached once via `#attachSortGlyphListener()`. Per-glyph `addEventListener` loop in `renderTableHeader` would have missed the inline initial render (which has glyph markup but no handlers). Delegation works regardless of how many times thead gets replaced. Pattern: `e.target.closest('.sort-glyph')`, read `dataset.column`, call `tabCtrl.sortByColumn(activeTab.label, columnKey)`.
-- `data-column` on each glyph carries the column key.
-- `SORTABLE` set inside `buildTheadHTML` is the single point of truth for which columns are clickable. Adding a column to the set is the only edit needed to make it sortable.
+The label dblclick (rename) stays where it was.
 
-## Debugging episodes worth remembering
-- **Twice during this conversation** my `web_fetch` of files from main returned a stale version that was missing real methods (`#evaluateAlerting`, `reorderTab`, `toggleNetworkTab`, etc.). The user pasted the correct current version both times. **Always ask the user to paste the current source before writing edits against a class with non-trivial existing logic.** Don't trust web_fetch as the canonical source.
-- **Silent failures with no console errors** are usually delegation/handler attachment problems. Three common shapes: handler attached to wrong element, handler attached to element that gets replaced, handler never invoked because the call site doesn't exist. The error "X is not a function" surfaces only after the user gets to a code path that actually invokes X — so an edit that silently failed to apply may not produce an error until a different feature is exercised.
-- **The userscript caching question is a real risk but always last on the diagnostic list.** The user's standing instruction is "do not blame the cache as first-line." Walk through actual code paths first.
-- **Console queries returning 0 elements when the screen clearly shows them** can happen when devtools are attached to a different document context than the userscript runs in. Trust visual evidence over `querySelectorAll` in the page-context console for userscripts.
+### Column sort glyph layout
+**File:** `src/views/neonova-dashboard-view.js`, `buildTheadHTML` method + style block.
+
+**Bug:** Sort glyphs (⇅/↑/↓) sat above narrow column labels instead of inline-left. Friendly Name, Radius UN, Status wrapped to two lines with glyph alone above; Duration was short enough to stay inline.
+
+**Fix:** Wrap glyph + label in `.th-content` flex container. Plus thead vertical-align fix.
+
+Markup change in sortable branch:
+
+    return `<th class="px-2 py-2 text-${c.align}">
+        <span class="th-content">
+            <span class="${glyphClasses}" data-column="${c.key}" title="Sort by ${c.label}">${glyph}</span>
+            <span class="column-label">${c.label}</span>
+        </span>
+    </th>`;
+
+CSS added to style block:
+
+    .th-content {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+    }
+    .neonova-dashboard thead th {
+        vertical-align: bottom;
+    }
+
+`.sort-glyph` rule was duplicated in the style block (margin-right: 6px in old, flex-shrink: 0 in new). Duplicate cleaned up — kept the new version, removed margin-right since `.th-content` owns spacing via gap.
+
+### Header column alignment
+**File:** `src/views/neonova-dashboard-view.js`, `buildTheadHTML`.
+
+**Bug:** Column headers indented 16px right of their data because th had `px-6` (24px) while td had `px-2` (8px).
+
+**Fix:** Changed both sortable and non-sortable th branches to `px-2 py-2`.
+
+### "Radius Username" → "RADIUS UN"
+Label rename in COLUMNS array. Fits one line at column width.
+
+### Header button uniformity
+**File:** `src/views/neonova-dashboard-view.js`, `getHeaderHTML` + `updatePrivacyButton`.
+
+All 5 header buttons (Privacy, Admins, Pause Polling, Refresh, Add Customer) unified to single shared class string:
+
+    whitespace-nowrap px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm
+
+- Emerald-700 fill matches active tab color (visual family)
+- White text, white/40 thin border
+- `whitespace-nowrap` prevents two-word labels from wrapping
+- `px-4` (was `px-6`) to save horizontal real estate
+
+Privacy button text changed to verb form: "Enable Privacy" / "Disable Privacy" (was "Privacy On" / "Privacy Off"). Action-on-click convention, matches imperative tone of other buttons. Title attributes carry current state info.
+
+Pause Polling icon and interval suffix recolored from emerald to white/white-70 to match new fill.
+
+**Pause Polling vertical-fatness fix:** The `text-sm` class on the interval suffix span was forcing a font-size mismatch with the main label, producing extra line-height. Removing `text-sm` made all five buttons match in height. The `text-white/70` opacity still makes the suffix read as secondary.
+
+### Privacy button gotcha
+`updatePrivacyButton` overwrites className on every call (including initial load). Its className string is a SECOND copy of the button class — must be kept in sync with `getHeaderHTML`. Easy to miss when bulk-editing. This is a strong argument for the upcoming shared button class refactor.
+
+## Planned: shared button class refactor (NOT STARTED)
+User wants to introduce `.neonova-btn` + variants (`-primary`, `-cancel`) defined in the central style block (NOT Tailwind utility chains in markup). Reasons:
+- Eliminates duplicate class strings across getHeaderHTML and updatePrivacyButton
+- Makes buttons render correctly when host page lacks Tailwind (userscript context)
+- Single point of edit for button styling
+
+**Suggested sequence (not started):**
+1. Define `.neonova-btn` base + `.neonova-btn-primary` variant in central style block. Don't migrate yet. Merge.
+2. Migrate header buttons (the 5 in this cycle) to use new classes. Merge.
+3. Migrate one view at a time (modals, customer rows, etc.). Each its own dev cycle.
+4. Define `.neonova-btn-cancel` once cancel buttons are inventoried. Migrate.
+
+**What won't migrate cleanly:**
+- Tab close x and tab add `+` (already have own classes, not toolbar buttons)
+- Drag handle (a span)
+- Tiny icon-only buttons (need `.neonova-btn-icon` variant)
+- Modal action buttons with destructive colors (need own variants)
+
+## Refresh button question (DEFERRED, raised but not addressed this cycle)
+User questioned whether Refresh still serves a purpose now that polling is automatic. Conclusion: it's still useful when polling is paused (only way to update data without resuming polling) and for "I just did X, I want to see the result NOW" cases. The "looks like it does nothing" complaint is real — fix would be: add spin-on-click feedback + brief flash/pulse on the "Last Updated" timestamp. Possibly shrink to icon-only. Not done; future cycle.
+
+## Communication notes
+- Hardware mode = design/planning, no code
+- Software mode = code generation OK
+- User holds strong MVC opinions, calls out architectural violations sharply
+- "Dev is where the work gets done; main is the stable baseline."
+- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes.
+- DO NOT pull `main.js` — production bootstrap is `scripts/neonova-dashboard.user.js`
+- URL fetcher constraint: only accepts URLs the user has explicitly pasted in conversation OR that appeared in search results. If a URL fetch fails, ask user to paste the raw URL.
+- When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump. When user asks for "the new class as a whole," do that, but err toward discrete edits.
+- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Give each block in its final form once.
+- When user is on dev/main/demo, REMEMBER which. Tailwind class availability differs:
+  - Demo: precompiled tailwind.css with explicit safelist. Classes not in safelist produce no CSS.
+  - Dev/main: runs as userscript on host page (admin.neonova.net). Tailwind from host CDN or none.
+- When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks rather than relying on utility classes that may or may not exist.
+- Long conversations degrade assistant accuracy — start fresh between phases.
+- "Blame the cache" is a lazy diagnosis. Do not reach for it as first guess.
+- **ALWAYS deliver memory files inside a code block.** No exceptions.
+
+## Debugging episodes worth remembering (this conversation)
+- web_fetch returned stale main TWICE during the Account Not Found diagnosis. The user pasted current source; my patch was based on stale code that referenced a removed `showToast` method. Always ask the user to paste current source before writing edits against a class with non-trivial existing logic.
+- Silent CSS failures: a CSS edit was added to the source file but didn't appear in the deployed style block. Diagnosis required dumping `document.querySelectorAll('style')` from the console to inspect what was actually present. The `.th-content` rule was missing entirely; `.sort-glyph` was present but duplicated. Don't trust source-matches-deployed assumption — verify with a console dump.
+- The `if (!document.getElementById('neonova-scroll-style'))` guard in `createElements` is a latent risk: if a userscript reload encounters an existing style block, new CSS rules don't get re-injected until a hard reload clears the old block. Worth fixing in a future cycle (replace contents instead of skipping).
+
+## Style block duplications to watch for
+- `.sort-glyph` rule appeared twice during this session (cleaned up)
+- `.neonova-tab-btn[draggable="true"] { cursor: grab; }` still appears twice in the style block (cosmetic dup, low priority)
+- The privacy button class string lives in TWO places (`getHeaderHTML` + `updatePrivacyButton`) — sync risk every edit
 
 ## Known main-branch latent bugs (deferred)
 - Dashboard view hardcodes logo URL pointing at old repo name `neonova-post-processor`. GitHub redirect for raw URLs is fragile.
 - Production header layout assumes host-page CSS resets (button white-space, flex-shrink). Demo's index.html works around in inline `<style>`.
+- Status-pill HTTP fetches are redundant with buffer-update event fetches (see Account Not Found architectural note above).
+- Style block existence check (`createElements`) skips re-injection if old block exists — stale CSS can persist until hard reload.
 
 ## Planned project rename (NOT STARTED)
 - Display: "Neonova Insight" → "Nova:Insight"
@@ -124,23 +183,6 @@ Two-state model preserved — clicking a column header is just another way to en
 - 9 demo registry usernames had underscores or hyphens; rewritten to substitute periods.
 - Matching rename shipped in demo/neonova-demo-seeder.js #SCENARIO. Both files MUST ship together.
 - Decision: do nothing about stale localStorage from returning visitors.
-
-## Communication notes
-- Hardware mode = design/planning, no code
-- Software mode = code generation OK
-- User holds strong MVC opinions, calls out architectural violations sharply
-- "Dev is where the work gets done; main is the stable baseline."
-- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes.
-- DO NOT pull `main.js` — production bootstrap is `scripts/neonova-dashboard.user.js`
-- URL fetcher constraint: only accepts URLs the user has explicitly pasted in conversation OR that appeared in search results. If a URL fetch fails, ask user to paste the raw URL.
-- When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump. When user asks for "the new class as a whole," do that, but err toward discrete edits for important classes the user doesn't want to risk corrupting on paste.
-- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Don't say "find this, replace with X, then find this again, replace with Y." Give each block in its final form once.
-- When user is on dev/main/demo, REMEMBER which. Tailwind class availability differs:
-  - Demo: precompiled tailwind.css with explicit safelist. Classes not in safelist produce no CSS.
-  - Dev/main: runs as userscript on host page (admin.neonova.net). Tailwind from host or none.
-- When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks rather than relying on utility classes that may or may not exist.
-- Long conversations degrade assistant accuracy — start fresh between phases.
-- "Blame the cache" is a lazy diagnosis. Do not reach for it as first guess.
 
 ## Raw URLs (file fetching reference)
 https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
