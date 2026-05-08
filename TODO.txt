@@ -1,5 +1,4 @@
-The clickbox on a given tab is too small.  It seems as if the entire mouse cursor has to be on the upper part of the tab, or no click is registered.
+
 A fresh view on the demo, after entering the passkey, throws an error about a user not being found in radius.
 Snapshots fill out the rest of the day, under certain conditions.  They should only build to the time requested, if building a current day snapshot.  
-"account not found" badges should be addressed.
 geolocating customers and building a map of which customers are fed out of which remote.
