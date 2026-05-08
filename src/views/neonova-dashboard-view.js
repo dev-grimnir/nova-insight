@@ -75,7 +75,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     <img src="https://raw.githubusercontent.com/dev-grimnir/neonova-post-processor/main/src/assets/nova-subscriber-logo.png" 
                          alt="Nova Subscriber" class="h-10 w-auto">
                     <button id="privacy-toggle-btn" 
-                            class="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm"
+                            class="whitespace-nowrap px-6 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm"
                             title="Toggle Privacy Mode">
                         Enable Privacy
                     </button>
@@ -90,7 +90,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     <!-- Polling control -->
                     <div class="relative group/polling">
                         <button id="poll-toggle-btn" 
-                                class="min-w-[180px] px-6 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm">
+                                class="min-w-[180px] whitespace-nowrap px-6 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm">
                             <i class="fas ${pollIcon} text-white"></i>
                             <span>${pollText} Polling</span>
                             <span class="text-white/70 text-sm font-mono">· ${interval} min</span>
@@ -121,7 +121,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
                     <button id="add-customer-btn" 
-                            class="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm">
+                            class="whitespace-nowrap px-6 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm">
                         Add Customer
                     </button>
                 </div>
