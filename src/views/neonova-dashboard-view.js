@@ -1,7 +1,7 @@
 class NeonovaDashboardView extends BaseNeonovaView {
     static COLUMNS = [
         { key: 'friendlyName', label: 'Friendly Name',   width: 18, align: 'left'  },
-        { key: 'radiusUser',   label: 'RADIUS Username', width: 18, align: 'left'  },
+        { key: 'radiusUser',   label: 'RADIUS UN', width: 18, align: 'left'  },
         { key: 'status',       label: 'Status',          width: 10, align: 'left'  },
         { key: 'duration',     label: 'Duration',        width: 14, align: 'left'  },
         { key: 'snapshot',     label: '24 Hr Snapshot',        width: 28, align: 'left'  },
@@ -41,7 +41,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
     
         const ths = NeonovaDashboardView.COLUMNS.map(c => {
             if (!SORTABLE.has(c.key)) {
-                return `<th class="px-6 py-2 text-${c.align}">${c.label}</th>`;
+                return `<th class="px-2 py-2 text-${c.align}">${c.label}</th>`;
             }
     
             let glyph = '⇅';
@@ -53,9 +53,11 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 ? 'sort-glyph sort-glyph-active'
                 : 'sort-glyph';
     
-            return `<th class="px-6 py-2 text-${c.align}">
-                <span class="${glyphClasses}" data-column="${c.key}" title="Sort by ${c.label}">${glyph}</span>
-                <span class="column-label">${c.label}</span>
+            return `<th class="px-2 py-2 text-${c.align}">
+                <span class="th-content">
+                    <span class="${glyphClasses}" data-column="${c.key}" title="Sort by ${c.label}">${glyph}</span>
+                    <span class="column-label">${c.label}</span>
+                </span>
             </th>`;
         }).join('');
     
@@ -267,6 +269,16 @@ class NeonovaDashboardView extends BaseNeonovaView {
                     transition: opacity 250ms ease;
                 }
 
+                .neonova-dashboard thead th {
+                    vertical-align: bottom;
+                }
+
+                .th-content {
+                   display: inline-flex;
+                   align-items: baseline;
+                   gap: 6px;
+               }
+
                 .dashboard-header {
                     border-top-left-radius: 24px;
                     border-top-right-radius: 24px;
@@ -313,6 +325,16 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 .neonova-scroll { scrollbar-width: thin; scrollbar-color: #34d399 #18181b; }
     
                 /* Tabs */
+                .sort-glyph {
+                    display: inline-block;
+                    color: #52525b;
+                    cursor: pointer;
+                    user-select: none;
+                    transition: color 150ms;
+                    font-size: 12px;
+                    line-height: 1;
+                    flex-shrink: 0;
+                }
                 .neonova-tab-btn {
                     padding: 6px 18px;
                     border-radius: 12px 12px 0 0;
@@ -357,17 +379,6 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 }
                 .neonova-tab-add:hover { color: #34d399; }
 
-                /* Column sort glyphs */
-                .sort-glyph {
-                    display: inline-block;
-                    margin-right: 6px;
-                    color: #52525b;
-                    cursor: pointer;
-                    user-select: none;
-                    transition: color 150ms;
-                    font-size: 12px;
-                    line-height: 1;
-                }
                 .sort-glyph:hover {
                     color: #34d399;
                 }
@@ -532,7 +543,7 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 this.controller.getTabController().rebuildTable();
             });
 
-            btn.querySelector('.tab-label').addEventListener('click', () => {
+            btn.addEventListener('click', () => {
                 this.controller.getTabController().switchTab(tab.label);
                 this.renderTabBar();
             });
