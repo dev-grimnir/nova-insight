@@ -103,7 +103,7 @@ class NeonovaTabController {
 
             if (ctrl.model.status === 'Account Not Found') {
                 this.remove(trimmed);
-                NeonovaToast.error('Customer not found in RADIUS');
+                NeonovaToast.error('Customer not found in RADIUS ' + trimmed);
                 return;
             }
             
