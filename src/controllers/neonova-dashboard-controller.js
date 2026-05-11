@@ -243,17 +243,18 @@ class NeonovaDashboardController {
 
             // No logs found in any lookback window
             if (!latest) {
-                if (customer.lastEventTime !== null) {
-                    // Known existing customer — preserve status, just increment duration
+                if (latest === null) {
+                    // Registry miss — genuinely not in RADIUS
+                    customer.update('Account Not Found', 0);
+                } else if (customer.lastEventTime !== null) {
+                    // Known existing customer with no recent events — preserve status, increment duration
                     const eventDate = new Date(customer.lastEventTime);
                     if (!isNaN(eventDate.getTime())) {
                         const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
                         if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
                     }
-                } else {
-                    // Never-seen customer — appropriate to mark as not found
-                    customer.update('Account Not Found', 0);
                 }
+                // else: never-seen customer, valid in registry, no events yet → leave as 'Connecting...'
                 return;
             }
 
