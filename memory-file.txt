@@ -12,129 +12,124 @@
 - Phase 2 (synthetic data, encrypted localStorage round-trip, seeder): DONE
 - Phase 3 (about-as-background, account list box): DONE; tooltips and fake phone DEFERRED. Phase 3 functionally closed.
 
-## Recent main-branch work (this conversation)
+## Recent work (this conversation)
 
-### Account Not Found bug fix
+### Passphrase info box (demo-only)
+**File:** `demo/neonova-passphrase-info-box.js` (new)
+
+Parallel to `demo/neonova-account-list-box.js`. Sidekick panel that appears beside the passphrase modal explaining what the passphrase is for, that the user can pick anything, and that it cannot be left blank. Hooks via MutationObserver on document.body watching for `#passphrase-modal`. Self-initializes; just included via `<script>` tag in `index.html`. No production changes.
+
+Inserts before modal content so flex order puts the box on the left and the modal on the right.
+
+### Connecting... / Account Not Found bug fix (main → demo)
 **File:** `src/controllers/neonova-dashboard-controller.js`, `updateCustomerStatus` method.
 
-**Bug:** Long-idle customers (no Start/Stop events in any lookback window up to 335 days) were being stamped 'Account Not Found' on every poll, overwriting their real Connected status. Took a status flip OR remove-and-readd to fix. The buggy block was:
+**Bug:** Three of 18 seeded demo customers (`pacific.st.node.04`, `bentleyville.tower.7`, `macgregor.relay` — all stable-business profiles) were being toasted as "not found in RADIUS" and removed. Manual add also failed. Triggered on demo but not on real RADIUS because real RADIUS reliably has *some* event in 11 months for any valid customer; the synthetic can legitimately produce empty streams for low-rate profiles.
+
+**Root cause:** The `if (!latest)` branch lost its strict `latest === null` discriminator at some point. The synthetic correctly returns:
+- `null` → username not in registry (genuinely not in RADIUS)
+- `undefined` → registered but no events in window
+- entry → found
+
+But the controller treated both falsy values identically and stamped 'Account Not Found' on undefined. With low-rate stable-business RNG seeds producing zero past events in the 37-day stream window, every poll for those customers returned undefined for every lookback → stamped not found → toasted and removed.
+
+**Fix:** Three-case branch:
 
     if (!latest) {
-        customer.update('Account Not Found', 0);
-        return;
-    }
-
-**Fix:** Guard on `customer.lastEventTime` first. Known existing customers preserve status and bump duration; only never-seen customers get stamped 'Account Not Found':
-
-    if (!latest) {
-        if (customer.lastEventTime !== null) {
+        if (latest === null) {
+            // Registry miss — genuinely not in RADIUS
+            customer.update('Account Not Found', 0);
+        } else if (customer.lastEventTime !== null) {
+            // Known existing customer with no recent events — preserve status, increment duration
             const eventDate = new Date(customer.lastEventTime);
             if (!isNaN(eventDate.getTime())) {
                 const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
                 if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
             }
-        } else {
-            customer.update('Account Not Found', 0);
         }
+        // else: never-seen customer, valid in registry, no events yet → leave as 'Connecting...'
         return;
     }
 
-**Architectural note (deferred):** The buffer-update block now ingests events into `customer.eventHistory` BEFORE the status-pill logic runs. The status-pill is doing redundant HTTP via `getLatestEntry` that overlaps the buffer's data. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching. Bigger reshape, separate cycle.
+`null` vs `undefined` distinction now matters. Production is unaffected (real RADIUS rarely returns undefined for a valid customer) but the semantic is now correct.
 
-### Tab dead-zone bug fix
-**File:** `src/views/neonova-dashboard-view.js`, `renderTabBar` method.
+### Synthetic stream floor (demo-only)
+**File:** `demo/neonova-http-controller-synthetic.js`, `#generateStream`.
 
-**Bug:** Clicking the lower half (or any padding/non-text area) of an inactive tab did nothing. Tab-switch handler was attached to `.tab-label` span only. Padding, counts span, and any non-text pixels of the button were dead.
+**Rule:** Every seeded demo customer MUST have at least one event with `dateObj.getTime() <= Date.now()` at stream-creation time. This is the dashboard's implicit invariant — without a past event, `getLatestEntry` returns undefined for every lookback and the customer is stuck on 'Connecting...' forever (after the controller fix above). The synthetic must satisfy what the dashboard expects of real RADIUS.
 
-**Fix:** Move the click handler from `.tab-label` to the button itself. Inner glyphs (mode, bell, close) already call `stopPropagation()`, so they're safe. Counts span (no handler) now bubbles to button → switches tab.
+**Two failure modes the floor addresses:**
+1. RNG produces zero disconnects across the whole 37-day window (low-rate stable-business)
+2. RNG produces events that all land in the future portion (after `demoEpoch`)
 
-    btn.addEventListener('click', () => {
-        this.controller.getTabController().switchTab(tab.label);
-        this.renderTabBar();
-    });
+**Fix:** Block inserted in `#generateStream` after the switch, before `events.sort(...)`:
 
-The label dblclick (rename) stays where it was.
-
-### Column sort glyph layout
-**File:** `src/views/neonova-dashboard-view.js`, `buildTheadHTML` method + style block.
-
-**Bug:** Sort glyphs (⇅/↑/↓) sat above narrow column labels instead of inline-left. Friendly Name, Radius UN, Status wrapped to two lines with glyph alone above; Duration was short enough to stay inline.
-
-**Fix:** Wrap glyph + label in `.th-content` flex container. Plus thead vertical-align fix.
-
-Markup change in sortable branch:
-
-    return `<th class="px-2 py-2 text-${c.align}">
-        <span class="th-content">
-            <span class="${glyphClasses}" data-column="${c.key}" title="Sort by ${c.label}">${glyph}</span>
-            <span class="column-label">${c.label}</span>
-        </span>
-    </th>`;
-
-CSS added to style block:
-
-    .th-content {
-        display: inline-flex;
-        align-items: baseline;
-        gap: 6px;
-    }
-    .neonova-dashboard thead th {
-        vertical-align: bottom;
+    const nowMs = Date.now();
+    const hasPastEvent = events.some(e => e.dateObj.getTime() <= nowMs);
+    if (!hasPastEvent) {
+        const anchorAgeMs = (7 + rng() * 7) * 24 * 3600 * 1000;
+        const anchorMs = epoch.getTime() - anchorAgeMs;
+        events.push({ dateObj: new Date(anchorMs), status: 'Start' });
     }
 
-`.sort-glyph` rule was duplicated in the style block (margin-right: 6px in old, flex-shrink: 0 in new). Duplicate cleaned up — kept the new version, removed margin-right since `.th-content` owns spacing via gap.
+Same rng instance preserves determinism per username. Start event so customer reads as Connected on initial poll (appropriate for stable-business). Floor runs for all cases uniformly; override profiles already have past events but the floor is cheap insurance.
 
-### Header column alignment
-**File:** `src/views/neonova-dashboard-view.js`, `buildTheadHTML`.
+**Carryover rule:** Any new profile type added later must produce at least one past event. Demo profiles fit the dashboard's invariants, not the other way around.
 
-**Bug:** Column headers indented 16px right of their data because th had `px-6` (24px) while td had `px-2` (8px).
+## Latent bugs identified but not fixed this cycle
 
-**Fix:** Changed both sortable and non-sortable th branches to `px-2 py-2`.
+### Duplicate toast on Account Not Found
+**Sites:** `updateCustomerStatus` (dashboard controller) AND `tabController.add` (tab controller) both fire `'Customer not found in RADIUS'` toast on the same condition. `add()` checks `ctrl.model.status === 'Account Not Found'` after calling `updateCustomerStatus` and fires a second toast.
 
-### "Radius Username" → "RADIUS UN"
-Label rename in COLUMNS array. Fits one line at column width.
+Fix when ready: remove the toast from `tabController.add`, keep the customer-remove. `updateCustomerStatus` owns the messaging:
 
-### Header button uniformity
-**File:** `src/views/neonova-dashboard-view.js`, `getHeaderHTML` + `updatePrivacyButton`.
+    if (ctrl.model.status === 'Account Not Found') {
+        this.remove(trimmed);
+        return;
+    }
 
-All 5 header buttons (Privacy, Admins, Pause Polling, Refresh, Add Customer) unified to single shared class string:
+Deferred — was discussed during diagnosis but the underlying not-found bug took priority.
 
-    whitespace-nowrap px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm
+### `getLatestEntry` backward-walk early-exit
+**File:** `demo/neonova-http-controller-synthetic.js`, `getLatestEntry`.
 
-- Emerald-700 fill matches active tab color (visual family)
-- White text, white/40 thin border
-- `whitespace-nowrap` prevents two-word labels from wrapping
-- `px-4` (was `px-6`) to save horizontal real estate
+Loop walks events array backward. `t > now` does `continue`, `t < cutoff` does `break`. If a stream has `[past_event, future_event]` and the lookback window is narrow, the loop skips the future event, then breaks on the past event because it's older than the narrow cutoff — returning undefined even though widening the lookback would find it.
 
-Privacy button text changed to verb form: "Enable Privacy" / "Disable Privacy" (was "Privacy On" / "Privacy Off"). Action-on-click convention, matches imperative tone of other buttons. Title attributes carry current state info.
+In practice the progressive lookback in `updateCustomerStatus` eventually widens enough that the past event falls inside `[cutoff, now]` and gets returned. But the early-break is semantically wrong; should `continue` instead of `break`, paying the full scan. Streams are small enough that the cost is trivial.
 
-Pause Polling icon and interval suffix recolored from emerald to white/white-70 to match new fill.
+### Other carry-over latent bugs (from prior session, still open)
+- Dashboard view hardcodes logo URL pointing at old repo name `neonova-post-processor`. GitHub redirect for raw URLs is fragile.
+- Status-pill HTTP fetches are redundant with buffer-update event fetches. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching.
+- Style block existence check in `createElements` (`if (!document.getElementById('neonova-scroll-style'))`) skips re-injection if old block exists — stale CSS can persist until hard reload. Replace contents instead of skipping.
+- Production header layout assumes host-page CSS resets.
 
-**Pause Polling vertical-fatness fix:** The `text-sm` class on the interval suffix span was forcing a font-size mismatch with the main label, producing extra line-height. Removing `text-sm` made all five buttons match in height. The `text-white/70` opacity still makes the suffix read as secondary.
+## Planned: shared button class refactor (NOT STARTED, carried forward)
+User wants `.neonova-btn` + variants (`-primary`, `-cancel`) defined in central style block (NOT Tailwind utility chains in markup). Reasons: eliminates duplicate class strings (e.g., privacy button className in two places), correct rendering when host page lacks Tailwind, single point of edit.
 
-### Privacy button gotcha
-`updatePrivacyButton` overwrites className on every call (including initial load). Its className string is a SECOND copy of the button class — must be kept in sync with `getHeaderHTML`. Easy to miss when bulk-editing. This is a strong argument for the upcoming shared button class refactor.
-
-## Planned: shared button class refactor (NOT STARTED)
-User wants to introduce `.neonova-btn` + variants (`-primary`, `-cancel`) defined in the central style block (NOT Tailwind utility chains in markup). Reasons:
-- Eliminates duplicate class strings across getHeaderHTML and updatePrivacyButton
-- Makes buttons render correctly when host page lacks Tailwind (userscript context)
-- Single point of edit for button styling
-
-**Suggested sequence (not started):**
+Suggested sequence:
 1. Define `.neonova-btn` base + `.neonova-btn-primary` variant in central style block. Don't migrate yet. Merge.
-2. Migrate header buttons (the 5 in this cycle) to use new classes. Merge.
-3. Migrate one view at a time (modals, customer rows, etc.). Each its own dev cycle.
+2. Migrate header buttons. Merge.
+3. Migrate one view at a time. Each its own dev cycle.
 4. Define `.neonova-btn-cancel` once cancel buttons are inventoried. Migrate.
 
-**What won't migrate cleanly:**
-- Tab close x and tab add `+` (already have own classes, not toolbar buttons)
-- Drag handle (a span)
-- Tiny icon-only buttons (need `.neonova-btn-icon` variant)
-- Modal action buttons with destructive colors (need own variants)
+Won't migrate cleanly: tab close x and tab add `+` (have own classes), drag handle (a span), icon-only buttons (need `.neonova-btn-icon`), modal destructive buttons (need own variants).
 
-## Refresh button question (DEFERRED, raised but not addressed this cycle)
-User questioned whether Refresh still serves a purpose now that polling is automatic. Conclusion: it's still useful when polling is paused (only way to update data without resuming polling) and for "I just did X, I want to see the result NOW" cases. The "looks like it does nothing" complaint is real — fix would be: add spin-on-click feedback + brief flash/pulse on the "Last Updated" timestamp. Possibly shrink to icon-only. Not done; future cycle.
+## Planned project rename (NOT STARTED, carried forward)
+- Display: "Neonova Insight" → "Nova:Insight"
+- Repo: `neonova-insight` → `nova-insight`
+- Class prefix: `Neonova` → `NovaInsight`
+- CSS prefix: `.neonova-` → `.ni-`
+- Sequence: rename on dev → merge to main → merge main into demo → one demo follow-up commit (index.html script paths, demo/*.js, about copy) → rename GitHub repo last to avoid breaking raw URLs mid-flight
+- Logo replacement: SVG with text "Nova" (green #34d399) + ":Insight" (white). Optional swish above all letters with green→white gradient and star at apex.
+
+## Refresh button question (DEFERRED, carried forward)
+User questioned whether Refresh still serves a purpose now that polling is automatic. Conclusion: still useful when polling is paused, and for "I just did X, I want to see the result NOW." The "looks like it does nothing" complaint is real — fix would be spin-on-click feedback + brief flash/pulse on "Last Updated" timestamp. Possibly shrink to icon-only.
+
+## Demo registry / sanitizer fix (DONE earlier, carried forward)
+- Add-customer username sanitizer in src/controllers/neonova-add-customer-controller.js strips everything outside [a-zA-Z0-9.] — by design.
+- 9 demo registry usernames had underscores or hyphens; rewritten to substitute periods.
+- Matching rename shipped in demo/neonova-demo-seeder.js #SCENARIO. Both files MUST ship together.
+- Decision: do nothing about stale localStorage from returning visitors.
 
 ## Communication notes
 - Hardware mode = design/planning, no code
@@ -143,46 +138,23 @@ User questioned whether Refresh still serves a purpose now that polling is autom
 - "Dev is where the work gets done; main is the stable baseline."
 - Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes.
 - DO NOT pull `main.js` — production bootstrap is `scripts/neonova-dashboard.user.js`
-- URL fetcher constraint: only accepts URLs the user has explicitly pasted in conversation OR that appeared in search results. If a URL fetch fails, ask user to paste the raw URL.
-- When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump. When user asks for "the new class as a whole," do that, but err toward discrete edits.
-- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Give each block in its final form once.
+- URL fetcher only accepts URLs the user has explicitly pasted in conversation OR that appeared in search results. If a URL fetch fails, ask user to paste the raw URL.
+- When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump.
+- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Each block in final form once.
+- **NEVER deliver a code edit with `// ... rest unchanged` or any placeholder comment that elides surrounding code.** When showing a method body, give the complete method body. User pastes verbatim; placeholder comments will break syntax (broke `#ensureStream` in this conversation — closed the method too early and threw the rest of the class outside).
 - When user is on dev/main/demo, REMEMBER which. Tailwind class availability differs:
   - Demo: precompiled tailwind.css with explicit safelist. Classes not in safelist produce no CSS.
   - Dev/main: runs as userscript on host page (admin.neonova.net). Tailwind from host CDN or none.
 - When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks rather than relying on utility classes that may or may not exist.
 - Long conversations degrade assistant accuracy — start fresh between phases.
 - "Blame the cache" is a lazy diagnosis. Do not reach for it as first guess.
+- **Top-level `await` at the browser console is unreliable — return values may show as `undefined` or fail silently when the underlying value is something else.** Don't trust console returns as ground truth; verify via in-code logging during the actual flow.
+- **Do not assume main and demo are in sync on a file just because the user said so earlier.** When diagnosing, ask for the current version of the relevant file at the moment of diagnosis. Stale assumptions wasted time this session.
 - **ALWAYS deliver memory files inside a code block.** No exceptions.
 
-## Debugging episodes worth remembering (this conversation)
-- web_fetch returned stale main TWICE during the Account Not Found diagnosis. The user pasted current source; my patch was based on stale code that referenced a removed `showToast` method. Always ask the user to paste current source before writing edits against a class with non-trivial existing logic.
-- Silent CSS failures: a CSS edit was added to the source file but didn't appear in the deployed style block. Diagnosis required dumping `document.querySelectorAll('style')` from the console to inspect what was actually present. The `.th-content` rule was missing entirely; `.sort-glyph` was present but duplicated. Don't trust source-matches-deployed assumption — verify with a console dump.
-- The `if (!document.getElementById('neonova-scroll-style'))` guard in `createElements` is a latent risk: if a userscript reload encounters an existing style block, new CSS rules don't get re-injected until a hard reload clears the old block. Worth fixing in a future cycle (replace contents instead of skipping).
-
-## Style block duplications to watch for
-- `.sort-glyph` rule appeared twice during this session (cleaned up)
-- `.neonova-tab-btn[draggable="true"] { cursor: grab; }` still appears twice in the style block (cosmetic dup, low priority)
+## Style block duplications to watch for (carried forward)
+- `.neonova-tab-btn[draggable="true"] { cursor: grab; }` appears twice in the style block (cosmetic dup, low priority)
 - The privacy button class string lives in TWO places (`getHeaderHTML` + `updatePrivacyButton`) — sync risk every edit
-
-## Known main-branch latent bugs (deferred)
-- Dashboard view hardcodes logo URL pointing at old repo name `neonova-post-processor`. GitHub redirect for raw URLs is fragile.
-- Production header layout assumes host-page CSS resets (button white-space, flex-shrink). Demo's index.html works around in inline `<style>`.
-- Status-pill HTTP fetches are redundant with buffer-update event fetches (see Account Not Found architectural note above).
-- Style block existence check (`createElements`) skips re-injection if old block exists — stale CSS can persist until hard reload.
-
-## Planned project rename (NOT STARTED)
-- Display: "Neonova Insight" → "Nova:Insight"
-- Repo: `neonova-insight` → `nova-insight`
-- Class prefix: `Neonova` → `NovaInsight`
-- CSS prefix: `.neonova-` → `.ni-`
-- Sequence: rename on dev → merge to main → merge main into demo → one demo follow-up commit (index.html script paths, demo/*.js, about copy) → rename GitHub repo last to avoid breaking raw URLs mid-flight
-- Logo replacement: SVG with text "Nova" (green #34d399) + ":Insight" (white). Optional swish above all letters with green→white gradient and star at apex.
-
-## Demo registry / sanitizer fix (DONE earlier, both files shipped together)
-- Add-customer username sanitizer in src/controllers/neonova-add-customer-controller.js strips everything outside [a-zA-Z0-9.] — by design.
-- 9 demo registry usernames had underscores or hyphens; rewritten to substitute periods.
-- Matching rename shipped in demo/neonova-demo-seeder.js #SCENARIO. Both files MUST ship together.
-- Decision: do nothing about stale localStorage from returning visitors.
 
 ## Raw URLs (file fetching reference)
 https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
@@ -229,3 +201,6 @@ https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neo
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-view.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-add-customer-view.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-dashboard-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/refs/heads/demo/demo/neonova-http-controller-synthetic.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/refs/heads/demo/demo/neonova-demo-seeder.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/refs/heads/demo/demo/neonova-account-list-box.js
