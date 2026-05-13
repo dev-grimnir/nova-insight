@@ -1,4 +1,5 @@
 class NeonovaCustomerController {
+    #model;
     constructor(dashboardController, radiusUsername = null, friendlyName = null, model = null) {
         this.dashboardController = dashboardController;
         this.#model = model || new NeonovaCustomerModel(
