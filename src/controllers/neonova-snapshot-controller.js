@@ -37,6 +37,73 @@ class NeonovaSnapshotController {
         return new NeonovaSnapshotController(username, friendlyName);
     }
 
+    async #loadInitial() {
+        this.spinnerView.show();
+        try {
+            const built = await this.#buildModel(this.startDate, this.endDate);
+            this.spinnerView.hide();
+    
+            if (built === null) {
+                const fmt = (d) => d.toLocaleString([], {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: 'numeric', minute: '2-digit'
+                });
+                NeonovaToast.show(`No data was found within this timeframe, [${fmt(this.startDate)} — ${fmt(this.endDate)}]`);
+                return;
+            }
+    
+            this.model = built;
+            this.view = new NeonovaSnapshotView(this);
+            this.view.show();
+        } catch (err) {
+            this.spinnerView.hide();
+            console.error('Failed to load snapshot:', err);
+            alert('Could not load connection snapshot. Check console.');
+        }
+    }
+
+    async #buildModel(startDate, endDate) {
+        const rawEntries = await NeonovaHTTPController.paginateReportLogs(
+            this.username, startDate, endDate, 0, 0, 23, 59
+        );
+        const cleanResult = NeonovaCollector.cleanEntries(rawEntries || []);
+        const cleaned = cleanResult.cleanedEntries || [];
+    
+        // Initial-load empty guard. Drilldowns are exempt — even an empty
+        // sub-range is renderable because state is inferable from context.
+        // Only the top-level entry into a snapshot can return null here;
+        // drillDown() doesn't go through this branch.
+        const isInitialLoad = (this.model == null);
+        if (isInitialLoad && cleaned.length < 1) return null;
+    
+        // Filter to the window for analyzer math. The analyzer's lead-time
+        // logic assumes entries are pre-filtered to [startDate, endDate];
+        // events that predate startDate get processed after the injected
+        // boundary entry, producing sessions whose duration spans from a
+        // pre-window event to an in-window event — sessionSeconds overflows
+        // and percentConnected clamps to 100%.
+        //
+        // The model still holds the unfiltered `cleaned` array so the chart
+        // can infer leading state from the most recent pre-window event.
+        const startMs = startDate.getTime();
+        const endMs   = endDate.getTime();
+        const inWindow = cleaned.filter(e => {
+            const t = e.dateObj && e.dateObj.getTime();
+            return t != null && t >= startMs && t <= endMs;
+        });
+    
+        const metrics = NeonovaAnalyzer.computeMetrics(inWindow, startDate, endDate);
+    
+        return new NeonovaSnapshotModel(
+            this.username,
+            this.friendlyName,
+            startDate,
+            endDate,
+            cleaned,
+            metrics
+        );
+    }
+
     /* ============================================================
      *  STATIC DATA PIPELINE
      * ============================================================ */
