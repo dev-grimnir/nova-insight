@@ -28,6 +28,52 @@ class NeonovaSnapshotController {
         }
     }
 
+        /**
+     * Analyze-only: build a model from an already-fetched events array,
+     * filtered to the requested sub-window. The analyzer's leadTime logic
+     * injects a boundary event at startDate, so dead space at the window's
+     * left edge is handled even without pre-window context.
+     */
+    static buildFromEvents(username, friendlyName, events, startDate, endDate) {
+        try {
+            const startMs = startDate.getTime();
+            const endMs   = endDate.getTime();
+            const inWindow = (events || []).filter(e => {
+                const t = e.dateObj && e.dateObj.getTime();
+                return t != null && t >= startMs && t <= endMs;
+            });
+    
+            const metrics = NeonovaAnalyzer.computeMetrics(inWindow, startDate, endDate);
+            if (!metrics) return null;
+            const entriesResult = NeonovaAnalyzer.getEntries(inWindow, startDate);
+            const entries = entriesResult?.entries || inWindow;
+    
+            return new NeonovaSnapshotModel(
+                username,
+                friendlyName || username,
+                startDate,
+                endDate,
+                metrics,
+                entries
+            );
+        } catch (err) {
+            console.error('NeonovaSnapshotController.buildFromEvents failed', err);
+            return null;
+        }
+    }
+
+    /**
+     * Build a controller that does NO fetching and owns NO view.
+     * Caller seeds its history with a model and hands it to an inline view.
+     */
+    static createHeadless(username, friendlyName) {
+        return new NeonovaSnapshotController(username, friendlyName);
+    }
+
+    /* ============================================================
+     *  STATIC DATA PIPELINE
+     * ============================================================ */
+
     /**
      * Analyze-only: build a model from an already-fetched events array,
      * filtered to the requested sub-window. The analyzer's leadTime logic
@@ -60,51 +106,6 @@ class NeonovaSnapshotController {
             const entriesResult = NeonovaAnalyzer.getEntries(inWindow, startDate);
             const entries = entriesResult?.entries || inWindow;
     
-            return new NeonovaSnapshotModel(
-                username,
-                friendlyName || username,
-                startDate,
-                endDate,
-                metrics,
-                entries
-            );
-        } catch (err) {
-            console.error('NeonovaSnapshotController.buildData failed', err);
-            return null;
-        }
-    }
-
-    /**
-     * Build a controller that does NO fetching and owns NO view.
-     * Caller seeds its history with a model and hands it to an inline view.
-     */
-    static createHeadless(username, friendlyName) {
-        return new NeonovaSnapshotController(username, friendlyName);
-    }
-
-    /* ============================================================
-     *  STATIC DATA PIPELINE
-     * ============================================================ */
-
-    /**
-     * Fetch → clean → compute → return NeonovaSnapshotModel.
-     * Used by both the modal flow and any inline caller that wants a
-     * snapshot model for a specific range without owning the pipeline.
-     */
-    static async buildData(username, friendlyName, startDate, endDate) {
-        try {
-            const raw = await NeonovaHTTPController.paginateReportLogs(
-                username, startDate, endDate
-            );
-            const cleanResult = NeonovaCollector.cleanEntries(raw);
-            const cleaned = Array.isArray(cleanResult)
-                ? cleanResult
-                : (cleanResult?.cleanedEntries || []);
-            const metrics = NeonovaAnalyzer.computeMetrics(cleanResult, startDate, endDate);
-            if (!metrics) return null;
-            const entriesResult = NeonovaAnalyzer.getEntries(cleanResult, startDate);
-            const entries = entriesResult?.entries || cleaned;
-
             return new NeonovaSnapshotModel(
                 username,
                 friendlyName || username,
