@@ -12,71 +12,108 @@
 - Phase 2 (synthetic data, encrypted localStorage round-trip, seeder): DONE
 - Phase 3 (about-as-background, account list box): DONE; tooltips and fake phone DEFERRED. Phase 3 functionally closed.
 
-## Recent work (this conversation)
+## Recent work (this session)
 
-### Passphrase info box (demo-only)
-**File:** `demo/neonova-passphrase-info-box.js` (new)
+### 24-hour snapshot click target on inline dashboard snapshot
+**Files:** `src/views/neonova-customer-view.js`, `src/controllers/neonova-customer-controller.js`
 
-Parallel to `demo/neonova-account-list-box.js`. Sidekick panel that appears beside the passphrase modal explaining what the passphrase is for, that the user can pick anything, and that it cannot be left blank. Hooks via MutationObserver on document.body watching for `#passphrase-modal`. Self-initializes; just included via `<script>` tag in `index.html`. No production changes.
+The inline snapshot bar in each customer row is now clickable; opens a 24-hour snapshot for that customer. Mirrors the existing status-pill → `open3DaySnapshot` pattern.
 
-Inserts before modal content so flex order puts the box on the left and the modal on the right.
+Customer view: snapshot host div gets `cursor: pointer` and tooltip; click handler branch added in `#attachListeners` checking `.snapshot-host` via `closest()` so clicks anywhere on the SVG bubble up.
 
-### Connecting... / Account Not Found bug fix (main → demo)
-**File:** `src/controllers/neonova-dashboard-controller.js`, `updateCustomerStatus` method.
+Customer controller: new `open24HourSnapshot()` sibling of `open3DaySnapshot()`. Uses strict `now - 24h` start (no midnight snap) so the snapshot window matches the inline bar's visible window exactly.
 
-**Bug:** Three of 18 seeded demo customers (`pacific.st.node.04`, `bentleyville.tower.7`, `macgregor.relay` — all stable-business profiles) were being toasted as "not found in RADIUS" and removed. Manual add also failed. Triggered on demo but not on real RADIUS because real RADIUS reliably has *some* event in 11 months for any valid customer; the synthetic can legitimately produce empty streams for low-rate profiles.
+### Snapshot drill-down past-day end-time clamp fix
+**File:** `src/views/neonova-snapshot-chart.js`, `#mountTickClickTargets`
 
-**Root cause:** The `if (!latest)` branch lost its strict `latest === null` discriminator at some point. The synthetic correctly returns:
-- `null` → username not in registry (genuinely not in RADIUS)
-- `undefined` → registered but no events in window
-- entry → found
+**Bug:** Clicking a day-tick on a snapshot drill-down hard-coded `drillEnd` to 23:59:59.999 of the clicked day. For *today*, that meant the analyzer credited the trailing gap from the last real event all the way to end-of-day in the last known status — inflating current-day uptime/downtime by however many hours remained.
 
-But the controller treated both falsy values identically and stamped 'Account Not Found' on undefined. With low-rate stable-business RNG seeds producing zero past events in the 37-day stream window, every poll for those customers returned undefined for every lookback → stamped not found → toasted and removed.
+**Fix:** Mirror the month-branch's clamp pattern on the day-branch. Append after the existing `drillStart`/`drillEnd` assignments in the `else` branch:
 
-**Fix:** Three-case branch:
+    if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
+    const upperMs = Math.min(endTime, Date.now());
+    if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
 
-    if (!latest) {
-        if (latest === null) {
-            // Registry miss — genuinely not in RADIUS
-            customer.update('Account Not Found', 0);
-        } else if (customer.lastEventTime !== null) {
-            // Known existing customer with no recent events — preserve status, increment duration
-            const eventDate = new Date(customer.lastEventTime);
-            if (!isNaN(eventDate.getTime())) {
-                const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
-                if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
-            }
-        }
-        // else: never-seen customer, valid in registry, no events yet → leave as 'Connecting...'
-        return;
+`Math.min(endTime, Date.now())` is defensive — `Date.now()` is universal upper bound, `endTime` keeps drill inside the snapshot. Past-day drills unaffected. Top-level snapshot was already fine (defaults `endDate` to `now`).
+
+### Snapshot view refactor (3-commit set, single dev cycle)
+
+Three structural changes shipped together. Visible duplication between the modal snapshot view and the report snapshot view was ~80% — same header structure, same drill wiring, same chart-lifecycle dance. The shared paradigm extracted into a new panel class; the two outer views shrank to chrome + composition.
+
+#### Commit 1: Slice-not-fetch architecture
+**File:** `src/controllers/neonova-snapshot-controller.js`
+
+Drill-downs no longer make HTTP calls. Initial load still does (via `buildData`), but `drillTo` now operates on the parent model's already-fetched events array.
+
+New static `buildFromEvents(username, friendlyName, events, startDate, endDate)` — analyze-only path. Filters events to `[startDate, endDate]` (critical — see below), runs `NeonovaAnalyzer.computeMetrics`, returns a fresh `NeonovaSnapshotModel`.
+
+`drillTo` updated:
+
+    async drillTo(startDate, endDate) {
+        const parent = this.historyStack[this.historyStack.length - 1];
+        if (!parent) return null;
+        const model = NeonovaSnapshotController.buildFromEvents(
+            this.username, this.friendlyName, parent.events, startDate, endDate
+        );
+        if (!model) return null;
+        this.historyStack.push(model);
+        return model;
     }
 
-`null` vs `undefined` distinction now matters. Production is unaffected (real RADIUS rarely returns undefined for a valid customer) but the semantic is now correct.
+Kept `async` keyword despite no awaits — preserves existing `await drillTo(...)` call sites unchanged.
 
-### Synthetic stream floor (demo-only)
-**File:** `demo/neonova-http-controller-synthetic.js`, `#generateStream`.
+`buildData` got the same defensive filter applied (the snapshot controller now consistently filters events to `[startDate, endDate]` before handing to analyzer, regardless of whether events came from HTTP or from a parent model).
 
-**Rule:** Every seeded demo customer MUST have at least one event with `dateObj.getTime() <= Date.now()` at stream-creation time. This is the dashboard's implicit invariant — without a past event, `getLatestEntry` returns undefined for every lookback and the customer is stuck on 'Connecting...' forever (after the controller fix above). The synthetic must satisfy what the dashboard expects of real RADIUS.
+#### Commit 2: Panel extraction
+**Files:** `src/views/neonova-snapshot-panel-view.js` (new), `src/views/neonova-snapshot-view.js` (full rewrite), `src/views/neonova-report-snapshot-view.js` (full rewrite)
 
-**Two failure modes the floor addresses:**
-1. RNG produces zero disconnects across the whole 37-day window (low-rate stable-business)
-2. RNG produces events that all land in the future portion (after `demoEpoch`)
+New `NeonovaSnapshotPanelView` owns the shared paradigm: header HTML (subtitle / daterange / uptime / Back button) + canvas + `#updateHeader` + `#initChart` + `#onRangeClick` + `#onBack` + chart instance. Mounted into whatever container its wrapper provides.
 
-**Fix:** Block inserted in `#generateStream` after the switch, before `events.sort(...)`:
+Constructor: `(controller, model, containerEl)`. Static `CHART_HEIGHT_PX = 320`. Selectors are class-scoped (`.snap-panel-subtitle`, `.snap-panel-daterange`, `.snap-panel-uptime`, `.snap-panel-back-btn`, `.snap-panel-body`, `.snap-panel-canvas`) and queried within `this.container` — no global ID collisions if multiple panels coexist.
 
-    const nowMs = Date.now();
-    const hasPastEvent = events.some(e => e.dateObj.getTime() <= nowMs);
-    if (!hasPastEvent) {
-        const anchorAgeMs = (7 + rng() * 7) * 24 * 3600 * 1000;
-        const anchorMs = epoch.getTime() - anchorAgeMs;
-        events.push({ dateObj: new Date(anchorMs), status: 'Start' });
-    }
+`NeonovaSnapshotView` slimmed to modal chrome + panel composition. Modal header row now just holds the Close button on the right; subtitle/daterange/uptime moved into the panel. `hide()` calls `super.hide()` only.
 
-Same rng instance preserves determinism per username. Start event so customer reads as Connected on initial poll (appropriate for stable-business). Floor runs for all cases uniformly; override profiles already have past events but the floor is cheap insurance.
+`NeonovaReportSnapshotView` slimmed to receive parent container + instantiate panel. No `destroy()`.
 
-**Carryover rule:** Any new profile type added later must produce at least one past event. Demo profiles fit the dashboard's invariants, not the other way around.
+#### Commit 3: Destroy method removal
+**Files:** `src/views/neonova-snapshot-view.js`, `src/views/neonova-report-snapshot-view.js`, `src/views/neonova-report-view.js`
 
-## Latent bugs identified but not fixed this cycle
+All `destroy()` methods removed. Chart instances die with their containing DOM; JS handles GC. `NeonovaReportView.hide()` now just nulls `this.inlineSnapshotView` and calls `super.hide()`.
+
+### Snapshot drill-down 100% uptime fix (the bug that surfaced the slice-not-fetch architecture's need for window filtering)
+
+After Commit 1 first deployed, every day-drilldown reported 100% uptime regardless of actual data. Root cause: `buildFromEvents` was handing the analyzer the entire parent event stream, but telling it `requestedStart`/`requestedEnd` = the narrow drill window. `#processAllEntries` accumulated `sessionSeconds` across the parent's full multi-day range; `#computeUptimeMetrics` divided by the narrow window's seconds; numerator > denominator; `Math.min(100, ratio)` clamped to 100.
+
+Fix: filter `events` to `[startDate, endDate]` inside `buildFromEvents` before the analyzer call. The analyzer's `#computeLeadTime` injects its own boundary at `requestedStart`, so leading-state correctness doesn't require pre-window context.
+
+### Dashboard 24-hour click 100% uptime fix
+Same shape of bug, different source of extra events. The inline snapshot click via `open24HourSnapshot` reported 100% because `NeonovaHTTPController.paginateReportLogs`'s `#buildPaginationParams` silently overrides `shour`/`smin` to `00:00` when explicit args are null, widening the actual fetch from `[now-24h, now]` to `[start-of-day, now]`. The analyzer was then handed ~41 hours of events and told the window was 24.
+
+Fix: apply the same defensive `[startDate, endDate]` filter to `buildData` (mirrors `buildFromEvents`). `buildData` and `buildFromEvents` now symmetric — both filter events to the requested window before the analyzer call, regardless of where events came from.
+
+The HTTP controller's silent shour/smin override is the upstream cause and remains unfixed in this cycle (intentionally — flagged for memory carryover; see latent bugs below). The snapshot controller is now hardened against it.
+
+## Architectural decisions confirmed this session
+
+- **`NeonovaSnapshotChart.buildPeriods` stays internal.** Earlier in this session I argued for hoisting it to public static so the customer-view inline snapshot could share it. Grimnir scoped that out: `NeonovaInlineSnapshotView` works perfectly and is not being touched. The chart class continues to own period-building privately.
+- **Boundary injection in `NeonovaAnalyzer.#computeLeadTime` is data, not presentation.** The injected opposite-status event at `requestedStart` is a valid anchor representing the modem's state entering the window. Parent models store events including the boundary (via `getEntries`); drill-downs inherit that, then the analyzer injects another boundary appropriate to the sub-window. Both layers' boundaries are correct for their respective windows.
+- **No destroy methods anywhere in the snapshot system.** GC handles it.
+- **The two snapshot view classes intentionally keep the same names (`NeonovaSnapshotView`, `NeonovaReportSnapshotView`) post-refactor.** The new shared class is `NeonovaSnapshotPanelView`.
+
+## Latent bugs identified but not fixed this session
+
+### `NeonovaHTTPController.#buildPaginationParams` silent time-of-day override
+**File:** `src/controllers/neonova-http-controller.js`
+
+When `paginateReportLogs` is called with explicit `startDate`/`endDate` but null hour/min args, `#buildPaginationParams` silently forces `shour=0, smin=0` for the start and `ehour=23, emin=59` for non-today end dates. This overrides the time component of any explicit Date objects passed in. Callers that snap to midnight (the 3-day path) are unaffected; callers that don't (the 24-hour path) get a wider fetch window than requested.
+
+**Fix when ready:** `#buildPaginationParams` should read `sDate.getHours()` / `sDate.getMinutes()` when explicit args are null, falling back to 0/0 only when no `startDate` was passed at all (the "fetch current month" entry path). Same for `eDate` and 23/59.
+
+Snapshot controller is currently defended via window-filtering in `buildData`, but the bug remains for any other caller of `paginateReportLogs`. The `getLatestEntry` method in the same file calls it with `(username, startDate, now)` — verify whether the silent override matters for that caller before fixing.
+
+### Cleanup-able minor stuff in `NeonovaHTTPController`
+- `paginateReportLogs` has a dead `const last = entries[entries.length - 1]` at the bottom (assigned, never used).
+- `#parsePageRows` builds a `rows` variable that's never read.
 
 ### Duplicate toast on Account Not Found
 **Sites:** `updateCustomerStatus` (dashboard controller) AND `tabController.add` (tab controller) both fire `'Customer not found in RADIUS'` toast on the same condition. `add()` checks `ctrl.model.status === 'Account Not Found'` after calling `updateCustomerStatus` and fires a second toast.
@@ -88,23 +125,22 @@ Fix when ready: remove the toast from `tabController.add`, keep the customer-rem
         return;
     }
 
-Deferred — was discussed during diagnosis but the underlying not-found bug took priority.
-
 ### `getLatestEntry` backward-walk early-exit
 **File:** `demo/neonova-http-controller-synthetic.js`, `getLatestEntry`.
 
-Loop walks events array backward. `t > now` does `continue`, `t < cutoff` does `break`. If a stream has `[past_event, future_event]` and the lookback window is narrow, the loop skips the future event, then breaks on the past event because it's older than the narrow cutoff — returning undefined even though widening the lookback would find it.
+Loop walks events array backward. `t > now` does `continue`, `t < cutoff` does `break`. If a stream has `[past_event, future_event]` and the lookback window is narrow, the loop skips the future event, then breaks on the past event because it's older than the narrow cutoff — returning undefined even though widening the lookback would find it. Practically masked by progressive-lookback widening but semantically wrong. Should `continue` instead of `break`.
 
-In practice the progressive lookback in `updateCustomerStatus` eventually widens enough that the past event falls inside `[cutoff, now]` and gets returned. But the early-break is semantically wrong; should `continue` instead of `break`, paying the full scan. Streams are small enough that the cost is trivial.
+### Duplicate methods in `NeonovaAnalyzer`
+The memory file flagged duplicate `getEntries`/`computeMetrics` definitions; the current main version inspected this session shows only single definitions. May have been resolved already, or may be branch-state confusion. Worth confirming next time the file is opened.
 
-### Other carry-over latent bugs (from prior session, still open)
+### Other carry-over latent bugs (from prior sessions, still open)
 - Dashboard view hardcodes logo URL pointing at old repo name `neonova-post-processor`. GitHub redirect for raw URLs is fragile.
 - Status-pill HTTP fetches are redundant with buffer-update event fetches. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching.
 - Style block existence check in `createElements` (`if (!document.getElementById('neonova-scroll-style'))`) skips re-injection if old block exists — stale CSS can persist until hard reload. Replace contents instead of skipping.
 - Production header layout assumes host-page CSS resets.
 
 ## Planned: shared button class refactor (NOT STARTED, carried forward)
-User wants `.neonova-btn` + variants (`-primary`, `-cancel`) defined in central style block (NOT Tailwind utility chains in markup). Reasons: eliminates duplicate class strings (e.g., privacy button className in two places), correct rendering when host page lacks Tailwind, single point of edit.
+`.neonova-btn` + variants (`-primary`, `-cancel`) defined in central style block (NOT Tailwind utility chains in markup). Reasons: eliminates duplicate class strings (e.g., privacy button className in two places), correct rendering when host page lacks Tailwind, single point of edit.
 
 Suggested sequence:
 1. Define `.neonova-btn` base + `.neonova-btn-primary` variant in central style block. Don't migrate yet. Merge.
@@ -134,29 +170,32 @@ User questioned whether Refresh still serves a purpose now that polling is autom
 ## Communication notes
 - Hardware mode = design/planning, no code
 - Software mode = code generation OK
+- DON'T flip into software mode without being told. Wait for the explicit signal even after a long hardware-mode planning thread.
 - User holds strong MVC opinions, calls out architectural violations sharply
 - "Dev is where the work gets done; main is the stable baseline."
-- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes.
+- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes. (Exception: when multiple changes are tightly coupled and being tested as a bundle, ship together.)
 - DO NOT pull `main.js` — production bootstrap is `scripts/neonova-dashboard.user.js`
-- URL fetcher only accepts URLs the user has explicitly pasted in conversation OR that appeared in search results. If a URL fetch fails, ask user to paste the raw URL.
+- **Don't use `web_fetch` on the repo. The fetch tool returns stale or wrong files repeatedly. This session it returned versions of `neonova-snapshot-controller.js` and `neonova-snapshot-view.js` that were both missing methods the live code calls, leading to bad advice. ALWAYS ask the user to paste the file. This is non-negotiable.**
 - When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump.
 - When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Each block in final form once.
-- **NEVER deliver a code edit with `// ... rest unchanged` or any placeholder comment that elides surrounding code.** When showing a method body, give the complete method body. User pastes verbatim; placeholder comments will break syntax (broke `#ensureStream` in this conversation — closed the method too early and threw the rest of the class outside).
+- **NEVER deliver a code edit with `// ... rest unchanged` or any placeholder comment that elides surrounding code.** When showing a method body, give the complete method body. User pastes verbatim; placeholder comments will break syntax.
 - When user is on dev/main/demo, REMEMBER which. Tailwind class availability differs:
   - Demo: precompiled tailwind.css with explicit safelist. Classes not in safelist produce no CSS.
   - Dev/main: runs as userscript on host page (admin.neonova.net). Tailwind from host CDN or none.
 - When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks rather than relying on utility classes that may or may not exist.
+- **Don't trust the JS console in Tampermonkey for ground-truth diagnostics. `document.querySelectorAll(...)` and similar return values are unreliable from the user's console environment. Use the Elements inspector and DOM outer HTML pastes instead.**
+- Top-level `await` at the browser console is unreliable — return values may show as `undefined` or fail silently. Don't trust console returns as ground truth; verify via in-code logging or DOM inspection.
 - Long conversations degrade assistant accuracy — start fresh between phases.
-- "Blame the cache" is a lazy diagnosis. Do not reach for it as first guess.
-- **Top-level `await` at the browser console is unreliable — return values may show as `undefined` or fail silently when the underlying value is something else.** Don't trust console returns as ground truth; verify via in-code logging during the actual flow.
-- **Do not assume main and demo are in sync on a file just because the user said so earlier.** When diagnosing, ask for the current version of the relevant file at the moment of diagnosis. Stale assumptions wasted time this session.
+- **"Blame the cache" is a lazy diagnosis.** Do not reach for it as first guess. Stale userscript bundles ARE a real failure mode, but check the live DOM (Elements panel) before invoking it.
+- **Don't sneak previously-rejected suggestions back in.** When the user has said "no destroy methods" or "the inline view is out of scope," respect that decisively across every subsequent code block. Re-adding rejected patterns mid-refactor wastes the user's review time and erodes trust.
+- **When a refactor is ready to commit, take the user at their word about the test plan.** If they say "I'll commit everything and test the bundle," don't keep proposing commit-by-commit sequencing.
 - **ALWAYS deliver memory files inside a code block.** No exceptions.
 
 ## Style block duplications to watch for (carried forward)
 - `.neonova-tab-btn[draggable="true"] { cursor: grab; }` appears twice in the style block (cosmetic dup, low priority)
 - The privacy button class string lives in TWO places (`getHeaderHTML` + `updatePrivacyButton`) — sync risk every edit
 
-## Raw URLs (file fetching reference)
+## Raw URLs (file fetching reference — NOTE: web_fetch on these is unreliable, ask user to paste)
 https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/utils.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/neonova-toast.js
@@ -195,6 +234,7 @@ https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neo
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-tab-view.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-chart.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-panel-view.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-snapshot-view.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-order-view.js
 https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-progress-view.js
