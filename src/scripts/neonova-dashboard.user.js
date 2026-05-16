@@ -7,8 +7,8 @@
 // @match        https://admin.neonova.net/*
 // @grant        none
 // @run-at       document-end
-// @updateURL    https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/scripts/neonova-dashboard.user.js
-// @downloadURL  https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/scripts/neonova-dashboard.user.js
+// @updateURL    https://raw.githubusercontent.com/dev-grimnir/neonova-insight/demo/src/scripts/neonova-dashboard.user.js
+// @downloadURL  https://raw.githubusercontent.com/dev-grimnir/neonova-insight/demo/src/scripts/neonova-dashboard.user.js
 // @require      https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/utils.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/neonova-toast.js

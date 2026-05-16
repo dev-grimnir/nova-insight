@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head> 
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neonova Insight — Interactive Demo</title>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <link rel="stylesheet" href="demo/tailwind.min.css">
+  <style>
+    .neonova-dashboard {
+            max-width: 1250px !important;
+    }
+    .neonova-dashboard #header-container > div > div {
+      flex-shrink: 0;
+    }
+    /* Production runs on a host page whose CSS resets buttons to
+       white-space: nowrap. The standalone demo page has no such reset. */
+    .neonova-dashboard button {
+      white-space: nowrap;
+    }
+  </style>
+
+  <!-- About-as-background styles -->
+  <style>
+    .about-header,
+    .about-body {
+      color: #d4d4d8; /* zinc-300 */
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .about-header {
+      text-align: center;
+      padding: 2.5rem 1.5rem 2rem;
+    }
+
+    .about-header-inner {
+      max-width: 56rem;
+      margin: 0 auto;
+    }
+
+    .about-header h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: #fafafa; /* zinc-50 */
+      margin: 0 0 0.5rem;
+      line-height: 1.1;
+    }
+
+    .about-tagline {
+      font-style: italic;
+      color: #a1a1aa; /* zinc-400 */
+      font-size: 1.125rem;
+      margin: 0 0 1.25rem;
+    }
+
+    .about-meta {
+      font-size: 0.95rem;
+      color: #a1a1aa;
+      margin: 0;
+    }
+
+    .about-meta a {
+      color: #e4e4e7; /* zinc-200 */
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .about-meta a:hover {
+      color: #fafafa;
+    }
+
+    .about-body {
+      /* Extra bottom padding so the last paragraph clears the
+         minimized panel strip at viewport bottom. */
+      padding: 2rem 1.5rem 6rem;
+    }
+
+    .about-body-inner {
+      max-width: 48rem;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .about-body p {
+      margin: 0 0 1.25rem;
+    }
+
+    .about-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .about-body strong {
+      color: #fafafa;
+      font-weight: 600;
+    }
+
+    .about-body code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9em;
+      background: #27272a; /* zinc-800 */
+      color: #e4e4e7;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+    }
+
+    @media (max-width: 640px) {
+      .about-header h1 {
+        font-size: 2.25rem;
+      }
+      .about-tagline {
+        font-size: 1rem;
+      }
+    }
+  </style>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-zinc-700 text-slate-200 font-sans">
+
+  <header class="about-header">
+    <div class="about-header-inner">
+      <h1>neonova-insight</h1>
+      <p class="about-tagline">An ISP support dashboard that lives on top of your RADIUS server.</p>
+      <p class="about-meta">
+        Live demo. Production code, synthetic data.
+        Source: <a href="https://github.com/dev-grimnir/neonova-insight">github.com/dev-grimnir/neonova-insight</a>
+      </p>
+    </div>
+  </header>
+
+  <section class="about-body">
+    <div class="about-body-inner">
+      <p>
+        <strong>What this is.</strong>
+        neonova-insight is a userscript that overlays a customer-health dashboard on top of a RADIUS server admin interface. It pulls connection event history, classifies links by stability, surfaces problems before customers call, and produces reports suitable for handoff to field techs or attachment to a ticket.
+      </p>
+
+      <p>
+        <strong>Why it exists.</strong>
+        The native interface presents connection history as a flat spreadsheet of timestamps. Reading a customer's stability means eyeballing session lengths and counting records inside a time window &mdash; doable for one customer, impractical for many.
+      </p>
+
+      <p>
+        This project started as a single-purpose userscript that did one thing: fill in how long a modem had been offline after it reconnected. That script is still in <code>scripts/</code>. A second script came next, generating reports that looked a lot like what the Report view produces today &mdash; but it wasn't headless, and you had to babysit it.
+      </p>
+
+      <p>
+        The dashboard is what happens when those scripts grow up. There's no real cap on how many modems it can watch concurrently &mdash; once a customer is located, each poll only fetches events since that customer's last known status change, so the per-poll cost stays flat as the watchlist grows. Real-time monitoring, snapshot history, threshold-based alerting, and report generation as a side effect rather than the main event.
+      </p>
+
+      <p>
+        <strong>What you're looking at.</strong>
+        Everything in the panel is production code. One file swap routes data calls to a synthetic event-stream generator instead of a real RADIUS server, so the 17 customers in the demo are scripted scenarios: stable residential links, flaky ones, a few business-grade nodes, a centerpiece outage in progress. The encrypted localStorage is real &mdash; set a passphrase from the admin menu and your session resumes when you come back. Generate reports, adjust thresholds, dig into snapshot histories. Nothing you do here touches a real network.
+      </p>
+
+      <p>
+        <strong>Under the hood.</strong>
+        Vanilla JavaScript, MVC, no framework. Tailwind v3.4 (precompiled), Chart.js for snapshot graphs, AES-GCM via WebCrypto for local persistence.
+      </p>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       Production sources — loaded in @require order from the userscript.
+       Order matters: core → models → controllers → views.
+       ===================================================================== -->
+
+  <!-- Core -->
+  <script src="src/core/utils.js"></script>
+  <script src="src/core/neonova-toast.js"></script>
+
+  <!-- Models -->
+  <script src="src/models/neonova-admin-model.js"></script>
+  <script src="src/models/log-entry.js"></script>
+  <script src="src/models/neonova-customer-model.js"></script>
+  <script src="src/models/neonova-admin-manager-model.js"></script>
+  <script src="src/models/neonova-dashboard-model.js"></script>
+  <script src="src/models/neonova-tab-model.js"></script>
+  <script src="src/models/neonova-report-model.js"></script>
+  <script src="src/models/neonova-snapshot-model.js"></script>
+
+  <!-- Controllers -->
+  <script src="src/controllers/neonova-admin-controller.js"></script>
+  <script src="src/controllers/neonova-admin-manager-controller.js"></script>
+  <script src="src/controllers/neonova-crypto-controller.js"></script>
+  <script src="demo/neonova-profile-registry.js"></script>
+  <script src="demo/neonova-http-controller-synthetic.js"></script>
+  <script src="demo/neonova-demo-seeder.js"></script>
+  <script src="src/controllers/neonova-progress-controller.js"></script>
+  <script src="src/controllers/neonova-collector.js"></script>
+  <script src="src/controllers/neonova-analyzer.js"></script>
+  <script src="src/controllers/neonova-passphrase-controller.js"></script>
+  <script src="src/controllers/neonova-customer-controller.js"></script>
+  <script src="src/controllers/neonova-report-order-controller.js"></script>
+  <script src="src/controllers/neonova-report-controller.js"></script>
+  <script src="src/controllers/neonova-snapshot-controller.js"></script>
+  <script src="src/controllers/neonova-tab-controller.js"></script>
+  <script src="src/controllers/neonova-add-customer-controller.js"></script>
+  <script src="src/controllers/neonova-dashboard-controller.js"></script>
+  <script src="src/controllers/neonova-notifier-controller.js"></script>
+
+  <!-- Views -->
+  <script src="src/views/base-neonova-view.js"></script>
+  <script src="src/views/neonova-base-modal-view.js"></script>
+  <script src="src/views/neonova-admin-view.js"></script>
+  <script src="src/views/neonova-admin-manager-view.js"></script>
+  <script src="src/views/neonova-inline-snapshot-view.js"></script>
+  <script src="src/views/neonova-spinner-view.js"></script>
+  <script src="src/views/neonova-passphrase-view.js"></script>
+  <script src="src/views/neonova-customer-view.js"></script>
+  <script src="src/views/neonova-tab-view.js"></script>
+  <script src="src/views/neonova-snapshot-chart.js"></script>
+  <script src="src/views/neonova-snapshot-view.js"></script>
+  <script src="src/views/neonova-report-snapshot-view.js"></script>
+  <script src="src/views/neonova-report-order-view.js"></script>
+  <script src="src/views/neonova-progress-view.js"></script>
+  <script src="src/views/neonova-report-view.js"></script>
+  <script src="src/views/neonova-add-customer-view.js"></script>
+  <script src="src/views/neonova-dashboard-view.js"></script>
+
+  
+  <script src="demo/neonova-account-list-box.js"></script>
+  <script src="demo/neonova-passphrase-info-box.js"></script>
+
+  <!-- Demo entry point -->
+  <script src="demo/neonova-demo-bootstrap.js"></script>
+
+</body>
+</html>
