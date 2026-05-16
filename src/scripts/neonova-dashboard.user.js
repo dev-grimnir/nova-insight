@@ -53,6 +53,7 @@
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/demo/src/views/neonova-report-view.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/demo/src/views/neonova-add-customer-view.js
 // @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/demo/src/views/neonova-dashboard-view.js
+// @require      https://raw.githubusercontent.com/dev-grimnir/neonova-insight/demo/src/views/neonova-snapshot-panel-view.js
 // ==/UserScript==
 
 (function() {
