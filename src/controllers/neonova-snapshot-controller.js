@@ -29,15 +29,24 @@ class NeonovaSnapshotController {
     }
 
     /**
-     * Analyze-only: build a model from an already-fetched events array.
-     * Used by drilldowns to avoid re-fetching data the parent model already has.
+     * Analyze-only: build a model from an already-fetched events array,
+     * filtered to the requested sub-window. The analyzer's leadTime logic
+     * injects a boundary event at startDate, so dead space at the window's
+     * left edge is handled even without pre-window context.
      */
     static buildFromEvents(username, friendlyName, events, startDate, endDate) {
         try {
-            const metrics = NeonovaAnalyzer.computeMetrics(events, startDate, endDate);
+            const startMs = startDate.getTime();
+            const endMs   = endDate.getTime();
+            const inWindow = (events || []).filter(e => {
+                const t = e.dateObj && e.dateObj.getTime();
+                return t != null && t >= startMs && t <= endMs;
+            });
+    
+            const metrics = NeonovaAnalyzer.computeMetrics(inWindow, startDate, endDate);
             if (!metrics) return null;
-            const entriesResult = NeonovaAnalyzer.getEntries(events, startDate);
-            const entries = entriesResult?.entries || events;
+            const entriesResult = NeonovaAnalyzer.getEntries(inWindow, startDate);
+            const entries = entriesResult?.entries || inWindow;
     
             return new NeonovaSnapshotModel(
                 username,
