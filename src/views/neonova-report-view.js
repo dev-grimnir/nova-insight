@@ -323,10 +323,7 @@ class NeonovaReportView extends NeonovaBaseModalView {
     }
 
     hide() {
-        if (this.inlineSnapshotView) {
-            this.inlineSnapshotView.destroy();
-            this.inlineSnapshotView = null;
-        }
+        this.inlineSnapshotView = null;
         super.hide();
     }
 }
