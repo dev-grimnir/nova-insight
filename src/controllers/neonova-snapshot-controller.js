@@ -15,7 +15,6 @@
  *   seedHistory(model) -> void  (used by inline callers)
  */
 class NeonovaSnapshotController {
-
     constructor(username, friendlyName, startDate = null, endDate = null) {
         this.username = username;
         this.friendlyName = friendlyName || username;
@@ -26,6 +25,31 @@ class NeonovaSnapshotController {
         // (report view embedding) should use NeonovaSnapshotController.createHeadless().
         if (startDate && endDate) {
             this.#loadAndShow(startDate, endDate);
+        }
+    }
+
+    /**
+     * Analyze-only: build a model from an already-fetched events array.
+     * Used by drilldowns to avoid re-fetching data the parent model already has.
+     */
+    static buildFromEvents(username, friendlyName, events, startDate, endDate) {
+        try {
+            const metrics = NeonovaAnalyzer.computeMetrics(events, startDate, endDate);
+            if (!metrics) return null;
+            const entriesResult = NeonovaAnalyzer.getEntries(events, startDate);
+            const entries = entriesResult?.entries || events;
+    
+            return new NeonovaSnapshotModel(
+                username,
+                friendlyName || username,
+                startDate,
+                endDate,
+                metrics,
+                entries
+            );
+        } catch (err) {
+            console.error('NeonovaSnapshotController.buildFromEvents failed', err);
+            return null;
         }
     }
 
@@ -102,12 +126,15 @@ class NeonovaSnapshotController {
      * ============================================================ */
 
     /**
-     * Push current onto history, fetch new range, return new model.
-     * Caller (view) re-renders with the returned model. Null on failure.
+     * Drill into a sub-range of the current model's data. Pure transform —
+     * no HTTP. Pushes the new model onto history. Null on failure.
      */
     async drillTo(startDate, endDate) {
-        const model = await NeonovaSnapshotController.buildData(
-            this.username, this.friendlyName, startDate, endDate
+        const parent = this.historyStack[this.historyStack.length - 1];
+        if (!parent) return null;
+    
+        const model = NeonovaSnapshotController.buildFromEvents(
+            this.username, this.friendlyName, parent.events, startDate, endDate
         );
         if (!model) return null;
         this.historyStack.push(model);
