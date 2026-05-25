@@ -369,10 +369,6 @@ class NeonovaHTTPController {
             page++;
         }
     
-        if (entries.length > 0) {
-            const last = entries[entries.length - 1];
-        }
-    
         return entries;
     }
 

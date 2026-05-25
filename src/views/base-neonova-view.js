@@ -10,11 +10,11 @@ class BaseNeonovaView extends EventTarget {
         this.accent = 'emerald';
         this.accentColor = 'emerald-500';
 
+        this.panel = null;
+
         // Container handling (for views that need a specific DOM element)
         if (container) {
             this.container = container;
-        } else {
-            this.panel = this.createPanelContainer();
         }
 
         // Load Tailwind if needed, but DO NOT auto-call render()

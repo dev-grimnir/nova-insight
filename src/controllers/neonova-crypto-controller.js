@@ -35,11 +35,8 @@ class NeonovaCryptoController {
      * Returns null if nothing stored or corrupted.
      */
     static async #loadRememberedMasterKey() {
-        //checking localStorage for remembered key
-
         const stored = localStorage.getItem('novaDashboardMasterKey');
         if (!stored) {
-            //no key found in localStorage
             return null;
         }
 
@@ -95,8 +92,6 @@ class NeonovaCryptoController {
      * Called only when rememberDevice = true.
      */
     static async #saveRememberedMasterKey(key) {
-        //exporting and saving raw key to localStorage
-
         const raw = await crypto.subtle.exportKey("raw", key);
         const b64 = btoa(String.fromCharCode(...new Uint8Array(raw)));
         localStorage.setItem('novaDashboardMasterKey', b64);
@@ -126,7 +121,6 @@ class NeonovaCryptoController {
         const remembered = await this.#loadRememberedMasterKey();
         if (remembered) {
             this.#masterKey = remembered;
-            //Remembered key LOADED successfully
             return;
         }
 
@@ -144,9 +138,7 @@ class NeonovaCryptoController {
      * Keeps the masterKey truly private while still allowing the dashboard to make the right decision.
      */
     static get hasMasterKey() {
-        const hasKey = !!this.#masterKey;
-        //returning: ${hasKey}
-        return hasKey;
+        return !!this.#masterKey;
     }
 
     /**
@@ -191,7 +183,6 @@ class NeonovaCryptoController {
         }
         const b64 = btoa(binary);
 
-        //success — stored base64 length: ${b64.length}`);
         return b64;
     }
 
@@ -233,8 +224,7 @@ class NeonovaCryptoController {
             ciphertext
         );
 
-        const result = new TextDecoder().decode(decrypted);;
-        return result;
+        return new TextDecoder().decode(decrypted);
     }
 
     /**
@@ -254,9 +244,6 @@ class NeonovaCryptoController {
 
         if (rememberDevice) {
             await this.#saveRememberedMasterKey(key);
-            //Master key saved to localStorage for future sessions");
-        } else {
-            //ey set for this session only (no rememberDevice)");
         }
     }
 }

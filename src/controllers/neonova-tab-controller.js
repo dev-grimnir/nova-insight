@@ -16,13 +16,6 @@ class NeonovaTabController {
         this.dashboardController.view.renderTabBar();
     }
 
-    //methods from dashboard controller
-    createCustomerController(customer) {
-        const ctrl = new NeonovaCustomerController(this.dashboardController, trimmed, friendlyName);
-        this.addCustomerToActiveTab(ctrl);
-        return ctrl;
-    }
-    
     getCustomerController(username) {
         return this.getActiveTab().customers.find(c => c.radiusUsername === username) || null;
     }
@@ -124,28 +117,6 @@ class NeonovaTabController {
         this.rebuildTable();
         this.dashboardController.view.updateHeader();
     }
-    /*
-    #parseDurationToSeconds(durationStr) {
-        if (!durationStr || durationStr === '—' || durationStr.includes('<1min')) {
-            return 30;  // treat <1min as ~30s so very new sessions sort near top
-        }
-    
-        let totalSeconds = 0;
-        const parts = durationStr.match(/(\d+)([dhms])/g) || [];
-    
-        for (const part of parts) {
-            const num = parseInt(part, 10);
-            const unit = part.slice(-1);
-    
-            if (unit === 'd') totalSeconds += num * 86400;
-            else if (unit === 'h') totalSeconds += num * 3600;
-            else if (unit === 'm') totalSeconds += num * 60;
-            else if (unit === 's') totalSeconds += num;
-        }
-    
-        return totalSeconds || 0;
-    }
-    */    
     //methods for tab controller
     initDefaultTab() {
         const defaultTab = new NeonovaTabModel('All', true);

@@ -409,11 +409,6 @@ class NeonovaDashboardView extends BaseNeonovaView {
                 .neonova-tab-btn.drop-before::before { left: -2px; }
                 .neonova-tab-btn.drop-after::after { right: -2px; }
 
-                /* Drag-and-drop reorder */
-                .neonova-tab-btn[draggable="true"] {
-                    cursor: grab;
-                }
-
                 /* Mode toggle icon (sort vs manual) */
                 .neonova-tab-btn .tab-mode-toggle {
                     margin-right: 6px;

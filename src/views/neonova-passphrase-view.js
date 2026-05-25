@@ -59,10 +59,8 @@ class NeonovaPassphraseView extends NeonovaBaseModalView {
             if (e.target.id === 'passphrase-modal') this.controller.handleCancel();
         });
 
-        // Enter key on input (exactly as before)
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
-                console.log("[NeonovaPassphraseView.input.keydown] Enter pressed — submitting");
                 e.preventDefault();
                 submit();
             }
@@ -86,8 +84,6 @@ class NeonovaPassphraseView extends NeonovaBaseModalView {
         toast.className = 'fixed top-8 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-3.5 rounded-2xl shadow-2xl z-[10000] flex items-center gap-3 text-sm font-medium animate-fade-in';
         toast.innerHTML = `Warning ${message}`;
         document.body.appendChild(toast);
-
-        console.log(`[NeonovaPassphraseView.showToast] displayed: "${message}"`);
 
         // Auto-dismiss after 2.8 seconds with smooth fade
         setTimeout(() => {
