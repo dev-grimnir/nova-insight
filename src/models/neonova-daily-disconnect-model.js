@@ -7,16 +7,20 @@ class NeonovaDailyDisconnectModel {
     }
 
     getDateRangeString() {
-        const options = { 
-            weekday: 'short', 
-            month: 'short', 
-            day: 'numeric', 
+        const options = {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
             year: 'numeric',
             hour: 'numeric',
             minute: '2-digit'
         };
-        const startStr = this.startDate.toLocaleString('en-US', options);
-        const endStr   = this.endDate.toLocaleString('en-US', options);
+        const startDate = new Date(this.date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(this.date);
+        endDate.setHours(23, 59, 59, 999);
+        const startStr = startDate.toLocaleString('en-US', options);
+        const endStr   = endDate.toLocaleString('en-US', options);
         return `${startStr} – ${endStr}`;
     }
 }

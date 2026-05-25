@@ -95,7 +95,7 @@ class NeonovaDashboardModel {
         }
 
         try {
-            const jsonStr = NeonovaCryptoController.decryptData(encrypted);
+            const jsonStr = await NeonovaCryptoController.decryptData(encrypted);
             const parsed = JSON.parse(jsonStr);
             this.settings = { ...this.settings, ...parsed };
         } catch (e) {

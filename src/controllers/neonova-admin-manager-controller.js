@@ -2,7 +2,6 @@ class NeonovaAdminManagerController {
     constructor() {
         this.model = new NeonovaAdminManagerModel();
         this.view = new NeonovaAdminManagerView(this);
-        this.load();
     }
 
     getAdminControllers() {
@@ -55,6 +54,7 @@ class NeonovaAdminManagerController {
     }
 
     async show() {
+        await this.load();
         await this.view.show();
     }
 }

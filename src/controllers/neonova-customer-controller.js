@@ -25,7 +25,6 @@ class NeonovaCustomerController {
     launchReport() {
         const username = this.model.radiusUsername;
         const friendlyName = this.model.friendlyName || username;
-        console.log('[launchReport] Starting for:', username, friendlyName);
         new NeonovaReportOrderController(username, friendlyName);
     }
 
@@ -35,8 +34,6 @@ class NeonovaCustomerController {
     
         const endDate = new Date();
         const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
-    
-        console.log(`[Snapshot] Opening 24-hour view for ${username}`);
     
         new NeonovaSnapshotController(username, friendlyName, startDate, endDate);
     }

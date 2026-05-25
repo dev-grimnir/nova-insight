@@ -140,10 +140,14 @@ class NeonovaDashboardController {
         this.initialized = true;
     
         await NeonovaCryptoController.initMasterKey();
-    
+
         if (!NeonovaCryptoController.hasMasterKey) {
             this.passphraseController = new NeonovaPassphraseController(this);
-            await this.passphraseController.show();
+            const accepted = await this.passphraseController.show();
+            if (!accepted) {
+                NeonovaToast.error("A passphrase is required. Reload the page to try again.");
+                return;
+            }
         }
     
         await this.#tabController.load(); 

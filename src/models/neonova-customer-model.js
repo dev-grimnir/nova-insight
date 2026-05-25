@@ -9,9 +9,7 @@ class NeonovaCustomerModel {
         this.durationSec = state.durationSec ?? 0;
         this.lastUpdate = state.lastUpdate || new Date().toLocaleString();
         this.lastEventTime = state.lastEventTime ? new Date(state.lastEventTime) : null;
-        this.disconnectedSince = (typeof state.disconnectedSince === 'number') ? state.disconnectedSince : null;
-        this.lastAlertSent     = (typeof state.lastAlertSent === 'number')     ? state.lastAlertSent     : null;
-        this.alertsSuppressed = state.alertsSuppressed === true;
+        this.alertsSuppressed  = state.alertsSuppressed === true;
         this.disconnectedSince = (typeof state.disconnectedSince === 'number') ? state.disconnectedSince : null;
         this.lastAlertSent     = (typeof state.lastAlertSent === 'number')     ? state.lastAlertSent     : null;
         
@@ -130,11 +128,9 @@ class NeonovaCustomerModel {
             status: this.status,
             durationSec: this.durationSec,
             lastUpdate: this.lastUpdate,
-            lastEventTime: this.lastEventTime instanceof Date 
-                ? this.lastEventTime.toISOString() 
+            lastEventTime: this.lastEventTime instanceof Date
+                ? this.lastEventTime.toISOString()
                 : (this.lastEventTime || null),
-            disconnectedSince: this.disconnectedSince,
-            lastAlertSent: this.lastAlertSent,
             disconnectedSince: this.disconnectedSince,
             lastAlertSent: this.lastAlertSent,
             eventHistory: historyOut

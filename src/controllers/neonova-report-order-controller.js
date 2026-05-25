@@ -1,6 +1,5 @@
 class NeonovaReportOrderController {
     constructor(username, friendlyName) {
-        console.log("ReportOrderController constructor");
         this.username = username;
         this.friendlyName = friendlyName || username;
         this.view = null;  // Created in start()
@@ -16,33 +15,15 @@ class NeonovaReportOrderController {
     }
 
     handleQuickReport(timeframe) {
-        // Controller decides dates based on constant
-        let startDate = null;
-        const endDate = new Date();
-
-        if (timeframe === '1_DAYS') {
-            startDate = new Date();
-            startDate.setDate(startDate.getDate() - 1);
-        } else if (timeframe === '2_DAYS') {
-            startDate = new Date();
-            startDate.setDate(startDate.getDate() - 2);
-        } else if (timeframe === '3_DAYS') {
-            startDate = new Date();
-            startDate.setDate(startDate.getDate() - 3);
-        } else if (timeframe === '7_DAYS') {
-            startDate = new Date();
-            startDate.setDate(startDate.getDate() - 7);
-        } else if (timeframe === '30_DAYS') {
-            startDate = new Date();
-            startDate.setDate(startDate.getDate() - 30);
-        } else if (timeframe === '90_DAYS') {
-            startDate = new Date();
-            startDate.setDate(startDate.getDate() - 90);
-        } else {
+        const DAYS = { '1_DAYS': 1, '2_DAYS': 2, '3_DAYS': 3, '7_DAYS': 7, '30_DAYS': 30, '90_DAYS': 90 };
+        const days = DAYS[timeframe];
+        if (!days) {
             console.error("NeonovaReportOrderController.handleQuickReport() -> Invalid Timeframe.");
             return;
         }
-
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
         this.startProgressController(startDate, endDate);
     }
 
