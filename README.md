@@ -1,12 +1,12 @@
-# NeoNova Subscriber Dashboard & Reports
+# Nova Subscriber Dashboard & Reports
 
-A powerful Tampermonkey userscript suite for NeoNova admins (`admin.neonova.net`). 
+A powerful Tampermonkey userscript suite for Nova admins (`admin.neonova.net`). 
 
 **Real-time customer monitoring + professional stability reports** with live polling, one click customer addition, and exports.
 
 Built for admins, field techs, and small ISPs who need better visibility into modem flaps, uptime, and reconnect behavior.
 
-![Dashboard Screenshot](https://github.com/dev-grimnir/neonova-post-processor/blob/main/screenshots/dashboard-ss.png)
+![Dashboard Screenshot](https://github.com/dev-grimnir/nova-insight/blob/main/screenshots/dashboard-ss.png)
 *(Live dashboard with polling controls, status table, and Add Customer modal – connected modems now sorted by shortest connection duration first)*
 
 ## Sample Interactive Report
@@ -14,14 +14,14 @@ Built for admins, field techs, and small ISPs who need better visibility into mo
 Here's a real generated report from an 11 month (max length) monitoring period (interactive version with live charts, tooltips, and export buttons):
 
 <p align="center">
-  <a href="https://dev-grimnir.github.io/neonova-post-processor/screenshots/example_radius_report.html" target="_blank">
+  <a href="https://dev-grimnir.github.io/nova-insight/screenshots/example_radius_report.html" target="_blank">
     <br>
     <strong>Open Interactive Sample Report →</strong>
   </a>
 </p>
 
 Or view the raw HTML directly:  
-[View raw sample report](https://raw.githubusercontent.com/dev-grimnir/neonova-post-processor/refs/heads/main/screenshots/example_radius_report.html)
+[View raw sample report](https://raw.githubusercontent.com/dev-grimnir/nova-insight/refs/heads/main/screenshots/example_radius_report.html)
 
 ## ✨ Current Features
 
@@ -43,14 +43,14 @@ Or view the raw HTML directly:
 
 ### Under the Hood
 - Fully modular MVC architecture (`src/{controllers, models, views, core, scripts}/`)
-- `NeonovaAnalyzer` refactored into clean private helpers with heavy comments
+- `NovaAnalyzer` refactored into clean private helpers with heavy comments
 - Stress-tested on massive accounts with over 100k results in one report
 - Zero console errors on normal use
 - Full test suite (Vitest) + architecture overview in [`docs/architecture.md`](docs/architecture.md)
 
 ## Security & Data Handling
 
-This is a **client-side Tampermonkey userscript** designed to make life easier for NeoNova administrators. It runs **entirely inside your browser** on `admin.neonova.net` and does nothing unless you are actively logged in.
+This is a **client-side Tampermonkey userscript** designed to make life easier for Nova administrators. It runs **entirely inside your browser** on `admin.neonova.net` and does nothing unless you are actively logged in.
 
 ### Why it can process large datasets quickly (and why that's not scary)
 The script can generate reports that pull and analyze hundreds of thousands of RADIUS log entries in hours rather than days simply because it automates the exact same actions you already perform manually in the admin portal.  
@@ -60,12 +60,12 @@ The script can generate reports that pull and analyze hundreds of thousands of R
 In short: it just saves you from having to sit there clicking “Next” for 45 minutes.
 
 ### Authentication & Access
-- The script **cannot function at all** without an active, 2FA-verified session on the NeoNova admin portal.  
+- The script **cannot function at all** without an active, 2FA-verified session on the Nova admin portal.  
 - It never stores, transmits, or interacts with passwords, 2FA tokens, or any credentials.  
 - It performs only actions that the currently logged-in user is already authorized to do through the normal web interface.
 
 ### Data Access
-- The script only reads and processes data that is already visible or exportable in the standard NeoNova admin UI while you are logged in.  
+- The script only reads and processes data that is already visible or exportable in the standard Nova admin UI while you are logged in.  
 - No additional privileges are requested or used.
 
 ### Persistent Storage (Encrypted)
@@ -86,7 +86,7 @@ If you have any security, compliance, or operational questions, feel free to rea
 1. Install **Tampermonkey** (Chrome / Firefox / Edge).
 2. Click this raw link — Tampermonkey will prompt to install:
 
-   - **[NeoNova Dashboard](https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/scripts/neonova-dashboard.user.js)** ← Main script  
+   - **[Nova Dashboard](https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/scripts/nova-dashboard.user.js)** ← Main script  
      (All supporting modules in `src/` are auto-`@require`d)
 
 3. Visit `https://admin.neonova.net` → log in → the dashboard panel appears automatically.

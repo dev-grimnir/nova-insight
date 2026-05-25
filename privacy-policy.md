@@ -1,9 +1,9 @@
 # Privacy Policy
 
-**Neonova Insight**  
+**Nova Insight**  
 *Last Updated: May 2, 2026*
 
-This Privacy Policy explains how Neonova Insight collects, uses, and protects your information when you use our diagnostic monitoring service.
+This Privacy Policy explains how Nova Insight collects, uses, and protects your information when you use our diagnostic monitoring service.
 
 ### Information We Collect
 We collect only the information necessary to deliver the service:
@@ -31,4 +31,4 @@ We may update this Privacy Policy occasionally. Significant changes will be comm
 
 ---
 
-**Questions?** Contact us using the details associated with your Neonova Insight account.
+**Questions?** Contact us using the details associated with your Nova Insight account.
