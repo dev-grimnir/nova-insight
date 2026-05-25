@@ -3,22 +3,22 @@
 <head> 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Neonova Insight — Interactive Demo</title>
+  <title>Nova Insight — Interactive Demo</title>
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <link rel="stylesheet" href="demo/tailwind.min.css">
   <style>
-    .neonova-dashboard {
+    .nova-dashboard {
             max-width: 1250px !important;
     }
-    .neonova-dashboard #header-container > div > div {
+    .nova-dashboard #header-container > div > div {
       flex-shrink: 0;
     }
     /* Production runs on a host page whose CSS resets buttons to
        white-space: nowrap. The standalone demo page has no such reset. */
-    .neonova-dashboard button {
+    .nova-dashboard button {
       white-space: nowrap;
     }
   </style>
@@ -124,11 +124,11 @@
 
   <header class="about-header">
     <div class="about-header-inner">
-      <h1>neonova-insight</h1>
+      <h1>nova-insight</h1>
       <p class="about-tagline">An ISP support dashboard that lives on top of your RADIUS server.</p>
       <p class="about-meta">
         Live demo. Production code, synthetic data.
-        Source: <a href="https://github.com/dev-grimnir/neonova-insight">github.com/dev-grimnir/neonova-insight</a>
+        Source: <a href="https://github.com/dev-grimnir/nova-insight">github.com/dev-grimnir/nova-insight</a>
       </p>
     </div>
   </header>
@@ -137,7 +137,7 @@
     <div class="about-body-inner">
       <p>
         <strong>What this is.</strong>
-        neonova-insight is a userscript that overlays a customer-health dashboard on top of a RADIUS server admin interface. It pulls connection event history, classifies links by stability, surfaces problems before customers call, and produces reports suitable for handoff to field techs or attachment to a ticket.
+        nova-insight is a userscript that overlays a customer-health dashboard on top of a RADIUS server admin interface. It pulls connection event history, classifies links by stability, surfaces problems before customers call, and produces reports suitable for handoff to field techs or attachment to a ticket.
       </p>
 
       <p>
@@ -172,63 +172,63 @@
 
   <!-- Core -->
   <script src="src/core/utils.js"></script>
-  <script src="src/core/neonova-toast.js"></script>
+  <script src="src/core/nova-toast.js"></script>
 
   <!-- Models -->
-  <script src="src/models/neonova-admin-model.js"></script>
+  <script src="src/models/nova-admin-model.js"></script>
   <script src="src/models/log-entry.js"></script>
-  <script src="src/models/neonova-customer-model.js"></script>
-  <script src="src/models/neonova-admin-manager-model.js"></script>
-  <script src="src/models/neonova-dashboard-model.js"></script>
-  <script src="src/models/neonova-tab-model.js"></script>
-  <script src="src/models/neonova-report-model.js"></script>
-  <script src="src/models/neonova-snapshot-model.js"></script>
+  <script src="src/models/nova-customer-model.js"></script>
+  <script src="src/models/nova-admin-manager-model.js"></script>
+  <script src="src/models/nova-dashboard-model.js"></script>
+  <script src="src/models/nova-tab-model.js"></script>
+  <script src="src/models/nova-report-model.js"></script>
+  <script src="src/models/nova-snapshot-model.js"></script>
 
   <!-- Controllers -->
-  <script src="src/controllers/neonova-admin-controller.js"></script>
-  <script src="src/controllers/neonova-admin-manager-controller.js"></script>
-  <script src="src/controllers/neonova-crypto-controller.js"></script>
-  <script src="demo/neonova-profile-registry.js"></script>
-  <script src="demo/neonova-http-controller-synthetic.js"></script>
-  <script src="demo/neonova-demo-seeder.js"></script>
-  <script src="src/controllers/neonova-progress-controller.js"></script>
-  <script src="src/controllers/neonova-collector.js"></script>
-  <script src="src/controllers/neonova-analyzer.js"></script>
-  <script src="src/controllers/neonova-passphrase-controller.js"></script>
-  <script src="src/controllers/neonova-customer-controller.js"></script>
-  <script src="src/controllers/neonova-report-order-controller.js"></script>
-  <script src="src/controllers/neonova-report-controller.js"></script>
-  <script src="src/controllers/neonova-snapshot-controller.js"></script>
-  <script src="src/controllers/neonova-tab-controller.js"></script>
-  <script src="src/controllers/neonova-add-customer-controller.js"></script>
-  <script src="src/controllers/neonova-dashboard-controller.js"></script>
-  <script src="src/controllers/neonova-notifier-controller.js"></script>
+  <script src="src/controllers/nova-admin-controller.js"></script>
+  <script src="src/controllers/nova-admin-manager-controller.js"></script>
+  <script src="src/controllers/nova-crypto-controller.js"></script>
+  <script src="demo/nova-profile-registry.js"></script>
+  <script src="demo/nova-http-controller-synthetic.js"></script>
+  <script src="demo/nova-demo-seeder.js"></script>
+  <script src="src/controllers/nova-progress-controller.js"></script>
+  <script src="src/controllers/nova-collector.js"></script>
+  <script src="src/controllers/nova-analyzer.js"></script>
+  <script src="src/controllers/nova-passphrase-controller.js"></script>
+  <script src="src/controllers/nova-customer-controller.js"></script>
+  <script src="src/controllers/nova-report-order-controller.js"></script>
+  <script src="src/controllers/nova-report-controller.js"></script>
+  <script src="src/controllers/nova-snapshot-controller.js"></script>
+  <script src="src/controllers/nova-tab-controller.js"></script>
+  <script src="src/controllers/nova-add-customer-controller.js"></script>
+  <script src="src/controllers/nova-dashboard-controller.js"></script>
+  <script src="src/controllers/nova-notifier-controller.js"></script>
 
   <!-- Views -->
-  <script src="src/views/base-neonova-view.js"></script>
-  <script src="src/views/neonova-base-modal-view.js"></script>
-  <script src="src/views/neonova-admin-view.js"></script>
-  <script src="src/views/neonova-admin-manager-view.js"></script>
-  <script src="src/views/neonova-inline-snapshot-view.js"></script>
-  <script src="src/views/neonova-spinner-view.js"></script>
-  <script src="src/views/neonova-passphrase-view.js"></script>
-  <script src="src/views/neonova-customer-view.js"></script>
-  <script src="src/views/neonova-tab-view.js"></script>
-  <script src="src/views/neonova-snapshot-chart.js"></script>
-  <script src="src/views/neonova-snapshot-view.js"></script>
-  <script src="src/views/neonova-report-snapshot-view.js"></script>
-  <script src="src/views/neonova-report-order-view.js"></script>
-  <script src="src/views/neonova-progress-view.js"></script>
-  <script src="src/views/neonova-report-view.js"></script>
-  <script src="src/views/neonova-add-customer-view.js"></script>
-  <script src="src/views/neonova-dashboard-view.js"></script>
+  <script src="src/views/base-nova-view.js"></script>
+  <script src="src/views/nova-base-modal-view.js"></script>
+  <script src="src/views/nova-admin-view.js"></script>
+  <script src="src/views/nova-admin-manager-view.js"></script>
+  <script src="src/views/nova-inline-snapshot-view.js"></script>
+  <script src="src/views/nova-spinner-view.js"></script>
+  <script src="src/views/nova-passphrase-view.js"></script>
+  <script src="src/views/nova-customer-view.js"></script>
+  <script src="src/views/nova-tab-view.js"></script>
+  <script src="src/views/nova-snapshot-chart.js"></script>
+  <script src="src/views/nova-snapshot-view.js"></script>
+  <script src="src/views/nova-report-snapshot-view.js"></script>
+  <script src="src/views/nova-report-order-view.js"></script>
+  <script src="src/views/nova-progress-view.js"></script>
+  <script src="src/views/nova-report-view.js"></script>
+  <script src="src/views/nova-add-customer-view.js"></script>
+  <script src="src/views/nova-dashboard-view.js"></script>
 
   
-  <script src="demo/neonova-account-list-box.js"></script>
-  <script src="demo/neonova-passphrase-info-box.js"></script>
+  <script src="demo/nova-account-list-box.js"></script>
+  <script src="demo/nova-passphrase-info-box.js"></script>
 
   <!-- Demo entry point -->
-  <script src="demo/neonova-demo-bootstrap.js"></script>
+  <script src="demo/nova-demo-bootstrap.js"></script>
 
 </body>
 </html>

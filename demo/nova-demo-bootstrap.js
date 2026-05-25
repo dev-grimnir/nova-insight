@@ -1,9 +1,9 @@
 /**
- * @file demo/neonova-demo-bootstrap.js
+ * @file demo/nova-demo-bootstrap.js
  *
  * Demo entry point. Mirrors the production userscript bootstrap exactly:
  *
- *     await NeonovaDashboardController.create();
+ *     await NovaDashboardController.create();
  *
  * That single line drives passphrase entry, settings load, tab restore,
  * and the first poll. After it resolves, we run the seeder if there's
@@ -16,7 +16,7 @@
 (async () => {
     let dashboardController;
     try {
-        dashboardController = await NeonovaDashboardController.create();
+        dashboardController = await NovaDashboardController.create();
     } catch (err) {
         console.error('[demo-bootstrap] Dashboard creation failed:', err);
         return;
@@ -24,9 +24,9 @@
 
     // Returning visitors with valid saved state get their session back —
     // shouldSeed() returns false when any tab already has customers.
-    if (NeonovaDemoSeeder.shouldSeed(dashboardController)) {
+    if (NovaDemoSeeder.shouldSeed(dashboardController)) {
         try {
-            await NeonovaDemoSeeder.seed(dashboardController);
+            await NovaDemoSeeder.seed(dashboardController);
         } catch (err) {
             console.error('[demo-bootstrap] Seeding failed:', err);
         }

@@ -1,7 +1,7 @@
 /**
- * @file demo/neonova-account-list-box.js
+ * @file demo/nova-account-list-box.js
  *
- * NeonovaAccountListBox — sidekick panel that appears next to the Add
+ * NovaAccountListBox — sidekick panel that appears next to the Add
  * Customer modal in the demo. Shows the full set of registry usernames.
  * Names already pre-seeded into a tab render muted grey; un-seeded names
  * render in emerald to suggest "try me."
@@ -17,7 +17,7 @@
  * — this file has no runtime dependencies on either.
  */
 
-class NeonovaAccountListBox {
+class NovaAccountListBox {
 
     // ────────────────────────────────────────────────────────────────────
     // VERIFY THIS LIST against the registry on the demo branch.
@@ -57,7 +57,7 @@ class NeonovaAccountListBox {
     ];
 
     // Names the seeder pre-populates across the three tabs.
-    // Source of truth: demo/neonova-demo-seeder.js #SCENARIO.
+    // Source of truth: demo/nova-demo-seeder.js #SCENARIO.
     static #SEEDED = new Set([
         // Network tab
         'chodges.mtwash',
@@ -138,4 +138,4 @@ class NeonovaAccountListBox {
     }
 }
 
-NeonovaAccountListBox.init();
+NovaAccountListBox.init();

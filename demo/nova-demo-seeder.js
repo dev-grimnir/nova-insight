@@ -1,7 +1,7 @@
 /**
- * @file demo/neonova-demo-seeder.js
+ * @file demo/nova-demo-seeder.js
  *
- * NeonovaDemoSeeder — pre-populate the dashboard with a curated scenario.
+ * NovaDemoSeeder — pre-populate the dashboard with a curated scenario.
  *
  * The seeder runs ONCE per session, only when the dashboard loads with no
  * pre-existing tab state. Returning visitors who entered a passphrase that
@@ -40,7 +40,7 @@
  *   "Watchlist" — the troubled customers a tech would actively monitor.
  */
 
-class NeonovaDemoSeeder {
+class NovaDemoSeeder {
 
     /**
      * Scenario definition. Order within each tab matters for friendlyName
@@ -136,7 +136,7 @@ class NeonovaDemoSeeder {
             await tabController.switchTab(tabSpec.label);
 
             for (const username of tabSpec.usernames) {
-                const profile = NeonovaProfileRegistry.get(username);
+                const profile = NovaProfileRegistry.get(username);
                 if (!profile) {
                     console.warn(`[seeder] Unknown username "${username}" in scenario; skipping.`);
                     continue;

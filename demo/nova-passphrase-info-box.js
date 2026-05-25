@@ -1,7 +1,7 @@
 /**
- * @file demo/neonova-passphrase-info-box.js
+ * @file demo/nova-passphrase-info-box.js
  *
- * NeonovaPassphraseInfoBox — sidekick panel that appears next to the
+ * NovaPassphraseInfoBox — sidekick panel that appears next to the
  * passphrase modal in the demo. Briefly explains what the passphrase
  * is for, that the user can pick anything, and that it cannot be left
  * blank.
@@ -16,7 +16,7 @@
  * <script> tag in index.html.
  */
 
-class NeonovaPassphraseInfoBox {
+class NovaPassphraseInfoBox {
 
     static init() {
         const observer = new MutationObserver(() => {
@@ -74,4 +74,4 @@ class NeonovaPassphraseInfoBox {
     }
 }
 
-NeonovaPassphraseInfoBox.init();
+NovaPassphraseInfoBox.init();
