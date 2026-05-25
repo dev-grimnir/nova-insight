@@ -1,12 +1,12 @@
 # Terms of Service
 
-**Neonova Insight**  
+**Nova Insight**  
 *Last Updated: May 2, 2026*
 
-By using Neonova Insight, you agree to these Terms of Service.
+By using Nova Insight, you agree to these Terms of Service.
 
 ### 1. Service Description
-Neonova Insight is a diagnostic monitoring system that delivers relevant system alerts, status updates, and diagnostic information to authorized recipients.
+Nova Insight is a diagnostic monitoring system that delivers relevant system alerts, status updates, and diagnostic information to authorized recipients.
 
 The service is provided **solely for receiving** monitoring communications.
 
@@ -22,7 +22,7 @@ You agree to use the service only for its intended purpose. You may **not**:
 The service is provided **"AS IS"** and **"AS AVAILABLE"** without any warranties, express or implied. We do not guarantee uninterrupted operation or error-free delivery of all messages.
 
 ### 4. Limitation of Liability
-To the maximum extent permitted by law, Neonova Insight will not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.
+To the maximum extent permitted by law, Nova Insight will not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.
 
 ### 5. Termination
 We reserve the right to suspend or terminate access to the service at any time, with or without notice, for conduct that violates these Terms.
@@ -35,4 +35,4 @@ We may update these Terms from time to time. Continued use of the service after 
 
 ---
 
-**Questions?** Contact us using the details associated with your Neonova Insight account.
+**Questions?** Contact us using the details associated with your Nova Insight account.
