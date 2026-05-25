@@ -1,7 +1,7 @@
 /**
- * @file demo/neonova-profile-registry.js
+ * @file demo/nova-profile-registry.js
  *
- * NeonovaProfileRegistry — Demo customer profile catalog.
+ * NovaProfileRegistry — Demo customer profile catalog.
  *
  * Every "valid" demo username lives here. Anything not in this map is
  * treated as a RADIUS miss (the synthetic HTTP controller returns null for
@@ -81,7 +81,7 @@ const BUSINESS_WEIGHTS = [
 ];
 
 
-class NeonovaProfileRegistry {
+class NovaProfileRegistry {
     /**
      * The full catalog of demo customers. Adding/removing entries here is the
      * single source of truth for the demo's allowlist. The synthetic HTTP

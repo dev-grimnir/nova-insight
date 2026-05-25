@@ -1,9 +1,9 @@
 /**
- * @file demo/neonova-http-controller-synthetic.js
+ * @file demo/nova-http-controller-synthetic.js
  *
- * NeonovaHTTPController — DEMO SYNTHETIC IMPLEMENTATION
+ * NovaHTTPController — DEMO SYNTHETIC IMPLEMENTATION
  *
- * Drop-in replacement for src/controllers/neonova-http-controller.js.
+ * Drop-in replacement for src/controllers/nova-http-controller.js.
  * Same class name. Same public static methods. Same return shapes. Same
  * legacy argument-shifting quirks. The rest of the app (collector, analyzer,
  * dashboard, tab controller, customer model, all views, crypto layer) runs
@@ -82,7 +82,7 @@
  * those code paths weren't progress-bar-worthy in production either.
  */
 
-class NeonovaHTTPController {
+class NovaHTTPController {
 
     /**************************************************************************
      * STATIC PRIVATE FIELDS
@@ -336,7 +336,7 @@ class NeonovaHTTPController {
             return cached;
         }
     
-        const profile = NeonovaProfileRegistry.get(username);
+        const profile = NovaProfileRegistry.get(username);
         console.log('[#ensureStream cache miss]', {
             username,
             hasProfile: !!profile
