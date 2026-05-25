@@ -1,231 +1,246 @@
-# Neonova Insight Project — Session Memory
+# Nova Insight Project — Session Memory
 
 ## Project state
-- Repo: github.com/dev-grimnir/neonova-insight
+- Repo: github.com/dev-grimnir/nova-insight
 - Branches: dev (working), main (stable), demo (live demo, branched off main)
 - Workflow: branch dev → fix one discrete problem → merge to main → delete dev → re-branch
-- Demo Pages URL: https://dev-grimnir.github.io/neonova-insight/
-- File URL pattern: https://raw.githubusercontent.com/dev-grimnir/neonova-insight/refs/heads/{branch}/{path}
+- Demo Pages URL: https://dev-grimnir.github.io/nova-insight/
+- File URL pattern: https://raw.githubusercontent.com/dev-grimnir/nova-insight/refs/heads/{branch}/{path}
 
 ## Demo phase status
 - Phase 1 (deploy pipeline): DONE
 - Phase 2 (synthetic data, encrypted localStorage round-trip, seeder): DONE
 - Phase 3 (about-as-background, account list box): DONE; tooltips and fake phone DEFERRED. Phase 3 functionally closed.
 
-## Recent main-branch work (this conversation)
+## Recent work (this session)
 
-### Account Not Found bug fix
-**File:** `src/controllers/neonova-dashboard-controller.js`, `updateCustomerStatus` method.
+### 24-hour snapshot click target on inline dashboard snapshot
+**Files:** `src/views/nova-customer-view.js`, `src/controllers/nova-customer-controller.js`
 
-**Bug:** Long-idle customers (no Start/Stop events in any lookback window up to 335 days) were being stamped 'Account Not Found' on every poll, overwriting their real Connected status. Took a status flip OR remove-and-readd to fix. The buggy block was:
+The inline snapshot bar in each customer row is now clickable; opens a 24-hour snapshot for that customer. Mirrors the existing status-pill → `open3DaySnapshot` pattern.
 
-    if (!latest) {
-        customer.update('Account Not Found', 0);
+Customer view: snapshot host div gets `cursor: pointer` and tooltip; click handler branch added in `#attachListeners` checking `.snapshot-host` via `closest()` so clicks anywhere on the SVG bubble up.
+
+Customer controller: new `open24HourSnapshot()` sibling of `open3DaySnapshot()`. Uses strict `now - 24h` start (no midnight snap) so the snapshot window matches the inline bar's visible window exactly.
+
+### Snapshot drill-down past-day end-time clamp fix
+**File:** `src/views/nova-snapshot-chart.js`, `#mountTickClickTargets`
+
+**Bug:** Clicking a day-tick on a snapshot drill-down hard-coded `drillEnd` to 23:59:59.999 of the clicked day. For *today*, that meant the analyzer credited the trailing gap from the last real event all the way to end-of-day in the last known status — inflating current-day uptime/downtime by however many hours remained.
+
+**Fix:** Mirror the month-branch's clamp pattern on the day-branch. Append after the existing `drillStart`/`drillEnd` assignments in the `else` branch:
+
+    if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
+    const upperMs = Math.min(endTime, Date.now());
+    if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
+
+`Math.min(endTime, Date.now())` is defensive — `Date.now()` is universal upper bound, `endTime` keeps drill inside the snapshot. Past-day drills unaffected. Top-level snapshot was already fine (defaults `endDate` to `now`).
+
+### Snapshot view refactor (3-commit set, single dev cycle)
+
+Three structural changes shipped together. Visible duplication between the modal snapshot view and the report snapshot view was ~80% — same header structure, same drill wiring, same chart-lifecycle dance. The shared paradigm extracted into a new panel class; the two outer views shrank to chrome + composition.
+
+#### Commit 1: Slice-not-fetch architecture
+**File:** `src/controllers/nova-snapshot-controller.js`
+
+Drill-downs no longer make HTTP calls. Initial load still does (via `buildData`), but `drillTo` now operates on the parent model's already-fetched events array.
+
+New static `buildFromEvents(username, friendlyName, events, startDate, endDate)` — analyze-only path. Filters events to `[startDate, endDate]` (critical — see below), runs `NovaAnalyzer.computeMetrics`, returns a fresh `NovaSnapshotModel`.
+
+`drillTo` updated:
+
+    async drillTo(startDate, endDate) {
+        const parent = this.historyStack[this.historyStack.length - 1];
+        if (!parent) return null;
+        const model = NovaSnapshotController.buildFromEvents(
+            this.username, this.friendlyName, parent.events, startDate, endDate
+        );
+        if (!model) return null;
+        this.historyStack.push(model);
+        return model;
+    }
+
+Kept `async` keyword despite no awaits — preserves existing `await drillTo(...)` call sites unchanged.
+
+`buildData` got the same defensive filter applied (the snapshot controller now consistently filters events to `[startDate, endDate]` before handing to analyzer, regardless of whether events came from HTTP or from a parent model).
+
+#### Commit 2: Panel extraction
+**Files:** `src/views/nova-snapshot-panel-view.js` (new), `src/views/nova-snapshot-view.js` (full rewrite), `src/views/nova-report-snapshot-view.js` (full rewrite)
+
+New `NovaSnapshotPanelView` owns the shared paradigm: header HTML (subtitle / daterange / uptime / Back button) + canvas + `#updateHeader` + `#initChart` + `#onRangeClick` + `#onBack` + chart instance. Mounted into whatever container its wrapper provides.
+
+Constructor: `(controller, model, containerEl)`. Static `CHART_HEIGHT_PX = 320`. Selectors are class-scoped (`.snap-panel-subtitle`, `.snap-panel-daterange`, `.snap-panel-uptime`, `.snap-panel-back-btn`, `.snap-panel-body`, `.snap-panel-canvas`) and queried within `this.container` — no global ID collisions if multiple panels coexist.
+
+`NovaSnapshotView` slimmed to modal chrome + panel composition. Modal header row now just holds the Close button on the right; subtitle/daterange/uptime moved into the panel. `hide()` calls `super.hide()` only.
+
+`NovaReportSnapshotView` slimmed to receive parent container + instantiate panel. No `destroy()`.
+
+#### Commit 3: Destroy method removal
+**Files:** `src/views/nova-snapshot-view.js`, `src/views/nova-report-snapshot-view.js`, `src/views/nova-report-view.js`
+
+All `destroy()` methods removed. Chart instances die with their containing DOM; JS handles GC. `NovaReportView.hide()` now just nulls `this.inlineSnapshotView` and calls `super.hide()`.
+
+### Snapshot drill-down 100% uptime fix (the bug that surfaced the slice-not-fetch architecture's need for window filtering)
+
+After Commit 1 first deployed, every day-drilldown reported 100% uptime regardless of actual data. Root cause: `buildFromEvents` was handing the analyzer the entire parent event stream, but telling it `requestedStart`/`requestedEnd` = the narrow drill window. `#processAllEntries` accumulated `sessionSeconds` across the parent's full multi-day range; `#computeUptimeMetrics` divided by the narrow window's seconds; numerator > denominator; `Math.min(100, ratio)` clamped to 100.
+
+Fix: filter `events` to `[startDate, endDate]` inside `buildFromEvents` before the analyzer call. The analyzer's `#computeLeadTime` injects its own boundary at `requestedStart`, so leading-state correctness doesn't require pre-window context.
+
+### Dashboard 24-hour click 100% uptime fix
+Same shape of bug, different source of extra events. The inline snapshot click via `open24HourSnapshot` reported 100% because `NovaHTTPController.paginateReportLogs`'s `#buildPaginationParams` silently overrides `shour`/`smin` to `00:00` when explicit args are null, widening the actual fetch from `[now-24h, now]` to `[start-of-day, now]`. The analyzer was then handed ~41 hours of events and told the window was 24.
+
+Fix: apply the same defensive `[startDate, endDate]` filter to `buildData` (mirrors `buildFromEvents`). `buildData` and `buildFromEvents` now symmetric — both filter events to the requested window before the analyzer call, regardless of where events came from.
+
+The HTTP controller's silent shour/smin override is the upstream cause and remains unfixed in this cycle (intentionally — flagged for memory carryover; see latent bugs below). The snapshot controller is now hardened against it.
+
+## Architectural decisions confirmed this session
+
+- **`NovaSnapshotChart.buildPeriods` stays internal.** Earlier in this session I argued for hoisting it to public static so the customer-view inline snapshot could share it. Grimnir scoped that out: `NovaInlineSnapshotView` works perfectly and is not being touched. The chart class continues to own period-building privately.
+- **Boundary injection in `NovaAnalyzer.#computeLeadTime` is data, not presentation.** The injected opposite-status event at `requestedStart` is a valid anchor representing the modem's state entering the window. Parent models store events including the boundary (via `getEntries`); drill-downs inherit that, then the analyzer injects another boundary appropriate to the sub-window. Both layers' boundaries are correct for their respective windows.
+- **No destroy methods anywhere in the snapshot system.** GC handles it.
+- **The two snapshot view classes intentionally keep the same names (`NovaSnapshotView`, `NovaReportSnapshotView`) post-refactor.** The new shared class is `NovaSnapshotPanelView`.
+
+## Latent bugs identified but not fixed this session
+
+### `NovaHTTPController.#buildPaginationParams` silent time-of-day override
+**File:** `src/controllers/nova-http-controller.js`
+
+When `paginateReportLogs` is called with explicit `startDate`/`endDate` but null hour/min args, `#buildPaginationParams` silently forces `shour=0, smin=0` for the start and `ehour=23, emin=59` for non-today end dates. This overrides the time component of any explicit Date objects passed in. Callers that snap to midnight (the 3-day path) are unaffected; callers that don't (the 24-hour path) get a wider fetch window than requested.
+
+**Fix when ready:** `#buildPaginationParams` should read `sDate.getHours()` / `sDate.getMinutes()` when explicit args are null, falling back to 0/0 only when no `startDate` was passed at all (the "fetch current month" entry path). Same for `eDate` and 23/59.
+
+Snapshot controller is currently defended via window-filtering in `buildData`, but the bug remains for any other caller of `paginateReportLogs`. The `getLatestEntry` method in the same file calls it with `(username, startDate, now)` — verify whether the silent override matters for that caller before fixing.
+
+### Cleanup-able minor stuff in `NovaHTTPController`
+- `paginateReportLogs` has a dead `const last = entries[entries.length - 1]` at the bottom (assigned, never used).
+- `#parsePageRows` builds a `rows` variable that's never read.
+
+### Duplicate toast on Account Not Found
+**Sites:** `updateCustomerStatus` (dashboard controller) AND `tabController.add` (tab controller) both fire `'Customer not found in RADIUS'` toast on the same condition. `add()` checks `ctrl.model.status === 'Account Not Found'` after calling `updateCustomerStatus` and fires a second toast.
+
+Fix when ready: remove the toast from `tabController.add`, keep the customer-remove. `updateCustomerStatus` owns the messaging:
+
+    if (ctrl.model.status === 'Account Not Found') {
+        this.remove(trimmed);
         return;
     }
 
-**Fix:** Guard on `customer.lastEventTime` first. Known existing customers preserve status and bump duration; only never-seen customers get stamped 'Account Not Found':
+### `getLatestEntry` backward-walk early-exit
+**File:** `demo/nova-http-controller-synthetic.js`, `getLatestEntry`.
 
-    if (!latest) {
-        if (customer.lastEventTime !== null) {
-            const eventDate = new Date(customer.lastEventTime);
-            if (!isNaN(eventDate.getTime())) {
-                const durationSeconds = Math.floor((Date.now() - eventDate.getTime()) / 1000);
-                if (durationSeconds >= 0) customer.update(customer.status, durationSeconds);
-            }
-        } else {
-            customer.update('Account Not Found', 0);
-        }
-        return;
-    }
+Loop walks events array backward. `t > now` does `continue`, `t < cutoff` does `break`. If a stream has `[past_event, future_event]` and the lookback window is narrow, the loop skips the future event, then breaks on the past event because it's older than the narrow cutoff — returning undefined even though widening the lookback would find it. Practically masked by progressive-lookback widening but semantically wrong. Should `continue` instead of `break`.
 
-**Architectural note (deferred):** The buffer-update block now ingests events into `customer.eventHistory` BEFORE the status-pill logic runs. The status-pill is doing redundant HTTP via `getLatestEntry` that overlaps the buffer's data. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching. Bigger reshape, separate cycle.
+### Duplicate methods in `NovaAnalyzer`
+The memory file flagged duplicate `getEntries`/`computeMetrics` definitions; the current main version inspected this session shows only single definitions. May have been resolved already, or may be branch-state confusion. Worth confirming next time the file is opened.
 
-### Tab dead-zone bug fix
-**File:** `src/views/neonova-dashboard-view.js`, `renderTabBar` method.
+### Other carry-over latent bugs (from prior sessions, still open)
+- Dashboard view hardcodes logo URL pointing at old repo name `nova-insight`. GitHub redirect for raw URLs is fragile.
+- Status-pill HTTP fetches are redundant with buffer-update event fetches. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching.
+- Style block existence check in `createElements` (`if (!document.getElementById('nova-scroll-style'))`) skips re-injection if old block exists — stale CSS can persist until hard reload. Replace contents instead of skipping.
+- Production header layout assumes host-page CSS resets.
 
-**Bug:** Clicking the lower half (or any padding/non-text area) of an inactive tab did nothing. Tab-switch handler was attached to `.tab-label` span only. Padding, counts span, and any non-text pixels of the button were dead.
+## Planned: shared button class refactor (NOT STARTED, carried forward)
+`.nova-btn` + variants (`-primary`, `-cancel`) defined in central style block (NOT Tailwind utility chains in markup). Reasons: eliminates duplicate class strings (e.g., privacy button className in two places), correct rendering when host page lacks Tailwind, single point of edit.
 
-**Fix:** Move the click handler from `.tab-label` to the button itself. Inner glyphs (mode, bell, close) already call `stopPropagation()`, so they're safe. Counts span (no handler) now bubbles to button → switches tab.
+Suggested sequence:
+1. Define `.nova-btn` base + `.nova-btn-primary` variant in central style block. Don't migrate yet. Merge.
+2. Migrate header buttons. Merge.
+3. Migrate one view at a time. Each its own dev cycle.
+4. Define `.nova-btn-cancel` once cancel buttons are inventoried. Migrate.
 
-    btn.addEventListener('click', () => {
-        this.controller.getTabController().switchTab(tab.label);
-        this.renderTabBar();
-    });
+Won't migrate cleanly: tab close x and tab add `+` (have own classes), drag handle (a span), icon-only buttons (need `.nova-btn-icon`), modal destructive buttons (need own variants).
 
-The label dblclick (rename) stays where it was.
+## Planned project rename (NOT STARTED, carried forward)
+- Display: "Nova Insight" → "Nova:Insight"
+- Repo: `nova-insight` → `nova-insight`
+- Class prefix: `Nova` → `NovaInsight`
+- CSS prefix: `.nova-` → `.ni-`
+- Sequence: rename on dev → merge to main → merge main into demo → one demo follow-up commit (index.html script paths, demo/*.js, about copy) → rename GitHub repo last to avoid breaking raw URLs mid-flight
+- Logo replacement: SVG with text "Nova" (green #34d399) + ":Insight" (white). Optional swish above all letters with green→white gradient and star at apex.
 
-### Column sort glyph layout
-**File:** `src/views/neonova-dashboard-view.js`, `buildTheadHTML` method + style block.
+## Refresh button question (DEFERRED, carried forward)
+User questioned whether Refresh still serves a purpose now that polling is automatic. Conclusion: still useful when polling is paused, and for "I just did X, I want to see the result NOW." The "looks like it does nothing" complaint is real — fix would be spin-on-click feedback + brief flash/pulse on "Last Updated" timestamp. Possibly shrink to icon-only.
 
-**Bug:** Sort glyphs (⇅/↑/↓) sat above narrow column labels instead of inline-left. Friendly Name, Radius UN, Status wrapped to two lines with glyph alone above; Duration was short enough to stay inline.
-
-**Fix:** Wrap glyph + label in `.th-content` flex container. Plus thead vertical-align fix.
-
-Markup change in sortable branch:
-
-    return `<th class="px-2 py-2 text-${c.align}">
-        <span class="th-content">
-            <span class="${glyphClasses}" data-column="${c.key}" title="Sort by ${c.label}">${glyph}</span>
-            <span class="column-label">${c.label}</span>
-        </span>
-    </th>`;
-
-CSS added to style block:
-
-    .th-content {
-        display: inline-flex;
-        align-items: baseline;
-        gap: 6px;
-    }
-    .neonova-dashboard thead th {
-        vertical-align: bottom;
-    }
-
-`.sort-glyph` rule was duplicated in the style block (margin-right: 6px in old, flex-shrink: 0 in new). Duplicate cleaned up — kept the new version, removed margin-right since `.th-content` owns spacing via gap.
-
-### Header column alignment
-**File:** `src/views/neonova-dashboard-view.js`, `buildTheadHTML`.
-
-**Bug:** Column headers indented 16px right of their data because th had `px-6` (24px) while td had `px-2` (8px).
-
-**Fix:** Changed both sortable and non-sortable th branches to `px-2 py-2`.
-
-### "Radius Username" → "RADIUS UN"
-Label rename in COLUMNS array. Fits one line at column width.
-
-### Header button uniformity
-**File:** `src/views/neonova-dashboard-view.js`, `getHeaderHTML` + `updatePrivacyButton`.
-
-All 5 header buttons (Privacy, Admins, Pause Polling, Refresh, Add Customer) unified to single shared class string:
-
-    whitespace-nowrap px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-medium rounded-2xl flex items-center justify-center gap-2 transition-all border border-white/40 shadow-sm
-
-- Emerald-700 fill matches active tab color (visual family)
-- White text, white/40 thin border
-- `whitespace-nowrap` prevents two-word labels from wrapping
-- `px-4` (was `px-6`) to save horizontal real estate
-
-Privacy button text changed to verb form: "Enable Privacy" / "Disable Privacy" (was "Privacy On" / "Privacy Off"). Action-on-click convention, matches imperative tone of other buttons. Title attributes carry current state info.
-
-Pause Polling icon and interval suffix recolored from emerald to white/white-70 to match new fill.
-
-**Pause Polling vertical-fatness fix:** The `text-sm` class on the interval suffix span was forcing a font-size mismatch with the main label, producing extra line-height. Removing `text-sm` made all five buttons match in height. The `text-white/70` opacity still makes the suffix read as secondary.
-
-### Privacy button gotcha
-`updatePrivacyButton` overwrites className on every call (including initial load). Its className string is a SECOND copy of the button class — must be kept in sync with `getHeaderHTML`. Easy to miss when bulk-editing. This is a strong argument for the upcoming shared button class refactor.
-
-## Planned: shared button class refactor (NOT STARTED)
-User wants to introduce `.neonova-btn` + variants (`-primary`, `-cancel`) defined in the central style block (NOT Tailwind utility chains in markup). Reasons:
-- Eliminates duplicate class strings across getHeaderHTML and updatePrivacyButton
-- Makes buttons render correctly when host page lacks Tailwind (userscript context)
-- Single point of edit for button styling
-
-**Suggested sequence (not started):**
-1. Define `.neonova-btn` base + `.neonova-btn-primary` variant in central style block. Don't migrate yet. Merge.
-2. Migrate header buttons (the 5 in this cycle) to use new classes. Merge.
-3. Migrate one view at a time (modals, customer rows, etc.). Each its own dev cycle.
-4. Define `.neonova-btn-cancel` once cancel buttons are inventoried. Migrate.
-
-**What won't migrate cleanly:**
-- Tab close x and tab add `+` (already have own classes, not toolbar buttons)
-- Drag handle (a span)
-- Tiny icon-only buttons (need `.neonova-btn-icon` variant)
-- Modal action buttons with destructive colors (need own variants)
-
-## Refresh button question (DEFERRED, raised but not addressed this cycle)
-User questioned whether Refresh still serves a purpose now that polling is automatic. Conclusion: it's still useful when polling is paused (only way to update data without resuming polling) and for "I just did X, I want to see the result NOW" cases. The "looks like it does nothing" complaint is real — fix would be: add spin-on-click feedback + brief flash/pulse on the "Last Updated" timestamp. Possibly shrink to icon-only. Not done; future cycle.
+## Demo registry / sanitizer fix (DONE earlier, carried forward)
+- Add-customer username sanitizer in src/controllers/nova-add-customer-controller.js strips everything outside [a-zA-Z0-9.] — by design.
+- 9 demo registry usernames had underscores or hyphens; rewritten to substitute periods.
+- Matching rename shipped in demo/nova-demo-seeder.js #SCENARIO. Both files MUST ship together.
+- Decision: do nothing about stale localStorage from returning visitors.
 
 ## Communication notes
 - Hardware mode = design/planning, no code
 - Software mode = code generation OK
+- DON'T flip into software mode without being told. Wait for the explicit signal even after a long hardware-mode planning thread.
 - User holds strong MVC opinions, calls out architectural violations sharply
 - "Dev is where the work gets done; main is the stable baseline."
-- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes.
-- DO NOT pull `main.js` — production bootstrap is `scripts/neonova-dashboard.user.js`
-- URL fetcher constraint: only accepts URLs the user has explicitly pasted in conversation OR that appeared in search results. If a URL fetch fails, ask user to paste the raw URL.
-- When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump. When user asks for "the new class as a whole," do that, but err toward discrete edits.
-- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Give each block in its final form once.
+- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes. (Exception: when multiple changes are tightly coupled and being tested as a bundle, ship together.)
+- DO NOT pull `main.js` — production bootstrap is `scripts/nova-dashboard.user.js`
+- **Don't use `web_fetch` on the repo. The fetch tool returns stale or wrong files repeatedly. This session it returned versions of `nova-snapshot-controller.js` and `nova-snapshot-view.js` that were both missing methods the live code calls, leading to bad advice. ALWAYS ask the user to paste the file. This is non-negotiable.**
+- When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump.
+- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Each block in final form once.
+- **NEVER deliver a code edit with `// ... rest unchanged` or any placeholder comment that elides surrounding code.** When showing a method body, give the complete method body. User pastes verbatim; placeholder comments will break syntax.
 - When user is on dev/main/demo, REMEMBER which. Tailwind class availability differs:
   - Demo: precompiled tailwind.css with explicit safelist. Classes not in safelist produce no CSS.
   - Dev/main: runs as userscript on host page (admin.neonova.net). Tailwind from host CDN or none.
 - When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks rather than relying on utility classes that may or may not exist.
+- **Don't trust the JS console in Tampermonkey for ground-truth diagnostics. `document.querySelectorAll(...)` and similar return values are unreliable from the user's console environment. Use the Elements inspector and DOM outer HTML pastes instead.**
+- Top-level `await` at the browser console is unreliable — return values may show as `undefined` or fail silently. Don't trust console returns as ground truth; verify via in-code logging or DOM inspection.
 - Long conversations degrade assistant accuracy — start fresh between phases.
-- "Blame the cache" is a lazy diagnosis. Do not reach for it as first guess.
+- **"Blame the cache" is a lazy diagnosis.** Do not reach for it as first guess. Stale userscript bundles ARE a real failure mode, but check the live DOM (Elements panel) before invoking it.
+- **Don't sneak previously-rejected suggestions back in.** When the user has said "no destroy methods" or "the inline view is out of scope," respect that decisively across every subsequent code block. Re-adding rejected patterns mid-refactor wastes the user's review time and erodes trust.
+- **When a refactor is ready to commit, take the user at their word about the test plan.** If they say "I'll commit everything and test the bundle," don't keep proposing commit-by-commit sequencing.
 - **ALWAYS deliver memory files inside a code block.** No exceptions.
 
-## Debugging episodes worth remembering (this conversation)
-- web_fetch returned stale main TWICE during the Account Not Found diagnosis. The user pasted current source; my patch was based on stale code that referenced a removed `showToast` method. Always ask the user to paste current source before writing edits against a class with non-trivial existing logic.
-- Silent CSS failures: a CSS edit was added to the source file but didn't appear in the deployed style block. Diagnosis required dumping `document.querySelectorAll('style')` from the console to inspect what was actually present. The `.th-content` rule was missing entirely; `.sort-glyph` was present but duplicated. Don't trust source-matches-deployed assumption — verify with a console dump.
-- The `if (!document.getElementById('neonova-scroll-style'))` guard in `createElements` is a latent risk: if a userscript reload encounters an existing style block, new CSS rules don't get re-injected until a hard reload clears the old block. Worth fixing in a future cycle (replace contents instead of skipping).
-
-## Style block duplications to watch for
-- `.sort-glyph` rule appeared twice during this session (cleaned up)
-- `.neonova-tab-btn[draggable="true"] { cursor: grab; }` still appears twice in the style block (cosmetic dup, low priority)
+## Style block duplications to watch for (carried forward)
+- `.nova-tab-btn[draggable="true"] { cursor: grab; }` appears twice in the style block (cosmetic dup, low priority)
 - The privacy button class string lives in TWO places (`getHeaderHTML` + `updatePrivacyButton`) — sync risk every edit
 
-## Known main-branch latent bugs (deferred)
-- Dashboard view hardcodes logo URL pointing at old repo name `neonova-post-processor`. GitHub redirect for raw URLs is fragile.
-- Production header layout assumes host-page CSS resets (button white-space, flex-shrink). Demo's index.html works around in inline `<style>`.
-- Status-pill HTTP fetches are redundant with buffer-update event fetches (see Account Not Found architectural note above).
-- Style block existence check (`createElements`) skips re-injection if old block exists — stale CSS can persist until hard reload.
-
-## Planned project rename (NOT STARTED)
-- Display: "Neonova Insight" → "Nova:Insight"
-- Repo: `neonova-insight` → `nova-insight`
-- Class prefix: `Neonova` → `NovaInsight`
-- CSS prefix: `.neonova-` → `.ni-`
-- Sequence: rename on dev → merge to main → merge main into demo → one demo follow-up commit (index.html script paths, demo/*.js, about copy) → rename GitHub repo last to avoid breaking raw URLs mid-flight
-- Logo replacement: SVG with text "Nova" (green #34d399) + ":Insight" (white). Optional swish above all letters with green→white gradient and star at apex.
-
-## Demo registry / sanitizer fix (DONE earlier, both files shipped together)
-- Add-customer username sanitizer in src/controllers/neonova-add-customer-controller.js strips everything outside [a-zA-Z0-9.] — by design.
-- 9 demo registry usernames had underscores or hyphens; rewritten to substitute periods.
-- Matching rename shipped in demo/neonova-demo-seeder.js #SCENARIO. Both files MUST ship together.
-- Decision: do nothing about stale localStorage from returning visitors.
-
-## Raw URLs (file fetching reference)
+## Raw URLs (file fetching reference — NOTE: web_fetch on these is unreliable, ask user to paste)
 https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/utils.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/core/neonova-toast.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-admin-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/log-entry.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-customer-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-admin-manager-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-dashboard-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-tab-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-report-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/models/neonova-snapshot-model.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-admin-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-admin-manager-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-crypto-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-http-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-progress-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-collector.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-analyzer.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-passphrase-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-customer-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-report-order-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-report-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-snapshot-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-tab-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-add-customer-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-dashboard-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/controllers/neonova-notifier-controller.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/base-neonova-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-base-modal-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-admin-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-admin-manager-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-inline-snapshot-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-spinner-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-passphrase-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-customer-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-tab-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-chart.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-snapshot-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-snapshot-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-order-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-progress-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-report-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-add-customer-view.js
-https://raw.githubusercontent.com/dev-grimnir/neonova-insight/main/src/views/neonova-dashboard-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/core/utils.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/core/nova-toast.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-admin-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/log-entry.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-customer-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-admin-manager-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-dashboard-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-tab-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-report-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/models/nova-snapshot-model.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-admin-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-admin-manager-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-crypto-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-http-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-progress-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-collector.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-analyzer.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-passphrase-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-customer-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-report-order-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-report-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-snapshot-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-tab-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-add-customer-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-dashboard-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-notifier-controller.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/base-nova-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-base-modal-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-admin-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-admin-manager-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-inline-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-spinner-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-passphrase-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-customer-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-tab-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-snapshot-chart.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-snapshot-panel-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-report-snapshot-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-report-order-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-progress-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-report-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-add-customer-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-dashboard-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/refs/heads/demo/demo/nova-http-controller-synthetic.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/refs/heads/demo/demo/nova-demo-seeder.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/refs/heads/demo/demo/nova-account-list-box.js
