@@ -32,6 +32,18 @@ class NovaSnapshotModel {
         if (v == null || v === '' || isNaN(Number(v))) return '0.0';
         return Number(v).toFixed(1);
     }
+
+    getCurrentStatus() {
+        const state   = this.metrics.finalState;
+        const transMs = this.metrics.lastTransitionMs;
+        if (!state || transMs == null) return { label: 'Unknown', duration: 'N/A', isUp: null };
+        const durationSec = (this.endDate.getTime() - transMs) / 1000;
+        return {
+            label:    state === 'up' ? 'Connected' : 'Disconnected',
+            duration: durationSec > 0 ? formatDuration(durationSec) : '< 1m',
+            isUp:     state === 'up'
+        };
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

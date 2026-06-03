@@ -23,16 +23,18 @@ class NovaSnapshotPanelView {
         if (!this.container) return;
         this.container.innerHTML = `
             <div class="bg-zinc-900 border border-zinc-700 rounded-3xl overflow-hidden">
-                <div class="px-8 py-6 border-b border-zinc-700 bg-[#09090b] flex items-center justify-between">
-                    <div class="flex items-center gap-4">
+                <div class="px-8 py-4 border-b border-zinc-700 bg-[#09090b] flex items-center justify-between gap-6">
+                    <div class="flex items-center gap-4 shrink-0">
                         <button class="snap-panel-back-btn hidden px-4 py-2 text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl flex items-center gap-2 transition">
                             ← Back
                         </button>
                         <div>
                             <div class="snap-panel-subtitle text-emerald-400 text-xs font-mono tracking-widest">${this.model.friendlyName || 'Customer'} — Connection Timeline</div>
                             <div class="snap-panel-daterange text-2xl font-semibold text-white mt-1">${this.model.getDateRangeString()}</div>
-                            <div class="snap-panel-uptime text-base font-medium text-emerald-400 mt-1">Uptime: ${this.model.getUptimePercent()}%</div>
                         </div>
+                    </div>
+                    <div class="snap-panel-ribbon flex flex-col gap-1.5 shrink-0">
+                        ${this.#buildRibbon()}
                     </div>
                 </div>
                 <div class="snap-panel-body p-6">
@@ -72,19 +74,91 @@ class NovaSnapshotPanelView {
     #updateHeader() {
         const subtitle  = this.container.querySelector('.snap-panel-subtitle');
         const daterange = this.container.querySelector('.snap-panel-daterange');
-        const uptime    = this.container.querySelector('.snap-panel-uptime');
+        const ribbon    = this.container.querySelector('.snap-panel-ribbon');
         const backBtn   = this.container.querySelector('.snap-panel-back-btn');
 
         if (subtitle)  subtitle.textContent  = `${this.model.friendlyName || 'Customer'} — Connection Timeline`;
         if (daterange) daterange.textContent = this.model.getDateRangeString();
-        if (uptime)    uptime.textContent    = `Uptime: ${this.model.getUptimePercent()}%`;
+        if (ribbon)    ribbon.innerHTML      = this.#buildRibbon();
 
         if (backBtn) backBtn.classList.toggle('hidden', !this.controller.canGoBack());
+        this.#attachTooltipListeners();
     }
 
     #attachListeners() {
         const backBtn = this.container.querySelector('.snap-panel-back-btn');
         backBtn?.addEventListener('click', () => this.#onBack());
+        this.#attachTooltipListeners();
+    }
+
+    #attachTooltipListeners() {
+        const anchor  = this.container.querySelector('.snap-tooltip-anchor');
+        const tooltip = this.container.querySelector('.snap-tooltip');
+        if (!anchor || !tooltip) return;
+
+        anchor.addEventListener('mouseenter', () => tooltip.classList.remove('hidden'));
+        anchor.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
+    }
+
+    #buildRibbon() {
+        const m      = this.model.getMetrics();
+        const status = this.model.getCurrentStatus();
+
+        const statusColor = status.isUp === null
+            ? 'text-zinc-400'
+            : status.isUp ? 'text-emerald-400' : 'text-red-400';
+
+        const fmtMin = (v) => {
+            if (v == null || v === 'N/A' || isNaN(Number(v))) return 'N/A';
+            return formatDuration(Number(v) * 60);
+        };
+
+        const longList = m.longDisconnects || [];
+        const longTooltipRows = longList.length === 0
+            ? '<div class="text-zinc-500 text-xs">None</div>'
+            : longList.map(d => {
+                const fmt = (dt) => dt instanceof Date
+                    ? dt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                    : '—';
+                const dur = d.durationSec ? formatDuration(d.durationSec) : '—';
+                return `<div class="text-zinc-300 text-xs py-0.5 border-b border-zinc-700 last:border-0">
+                    <span class="text-zinc-500">${fmt(d.stopDate)}</span> → <span class="text-zinc-500">${fmt(d.startDate)}</span>
+                    <span class="text-red-400 ml-1">(${dur})</span>
+                </div>`;
+            }).join('');
+
+        const stat = (label, value, valueClass = 'text-white') =>
+            `<div class="flex flex-col items-center px-3 py-1.5 bg-zinc-800 rounded-xl min-w-[90px]">
+                <span class="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">${label}</span>
+                <span class="text-sm font-semibold ${valueClass} whitespace-nowrap">${value}</span>
+            </div>`;
+
+        const longDisconnectStat =
+            `<div class="relative snap-tooltip-anchor flex flex-col items-center px-3 py-1.5 bg-zinc-800 rounded-xl min-w-[90px] cursor-default">
+                <span class="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">Long Disconnects</span>
+                <span class="text-sm font-semibold text-white">${longList.length}</span>
+                <div class="snap-tooltip hidden absolute bottom-full right-0 mb-2 z-50 bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl">
+                    <div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>
+                    ${longTooltipRows}
+                </div>
+            </div>`;
+
+        return `
+            <div class="flex gap-2">
+                ${stat('Current Status', `${status.label}: ${status.duration}`, statusColor)}
+                ${stat('Uptime', `${this.model.getUptimePercent()}%`, 'text-emerald-400')}
+                ${stat('Disconnects', m.disconnects ?? 'N/A')}
+                ${stat('Last Drop', m.timeSinceLastStr || 'N/A')}
+                ${longDisconnectStat}
+            </div>
+            <div class="flex gap-2">
+                ${stat('Avg Session', fmtMin(m.avgSessionMin))}
+                ${stat('Longest Session', fmtMin(m.longestSessionMin))}
+                ${stat('Avg Reconnect', fmtMin(m.avgReconnectMin))}
+                ${stat('Business Hrs', m.businessDisconnects ?? 'N/A')}
+                ${stat('Off-Hours', m.offHoursDisconnects ?? 'N/A')}
+            </div>
+        `;
     }
 
     async #onRangeClick(startDate, endDate) {
