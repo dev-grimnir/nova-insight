@@ -80,6 +80,10 @@ class NovaSnapshotChart {
             ticks.push(cursor.getTime());
             cursor.setTime(cursor.getTime() + INTERVAL);
         }
+        // Always label the right edge so the chart end isn't unlabelled
+        if (ticks.length === 0 || ticks[ticks.length - 1] < endMs) {
+            ticks.push(endMs);
+        }
         return ticks;
     }
 

@@ -197,6 +197,14 @@ class NovaSnapshotPanelView {
     }
 
     async #onRangeClick(startDate, endDate) {
+        const eventsInRange = (this.model.getEvents() || []).filter(e =>
+            e.dateObj && e.dateObj >= startDate && e.dateObj <= endDate
+        );
+        if (eventsInRange.length === 0) {
+            NovaToast.error('No change in status for this customer within the requested range.');
+            return;
+        }
+
         const fmt = (d) => d.toLocaleDateString();
         const body = this.container.querySelector('.snap-panel-body');
         if (body) {
@@ -210,6 +218,7 @@ class NovaSnapshotPanelView {
 
         const model = await this.controller.drillTo(startDate, endDate);
         if (!model) {
+            NovaToast.error('No change in status for this customer within the requested range.');
             this.#renderBody();
             setTimeout(() => this.#initChart(), 150);
             return;
