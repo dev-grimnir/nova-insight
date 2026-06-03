@@ -21,10 +21,14 @@ class NovaSnapshotModel {
 
     getDateRangeString() {
         const fmt = (d) => d.toLocaleString([], {
-            year: 'numeric', month: 'short', day: 'numeric',
+            year: '2-digit', month: 'numeric', day: 'numeric',
             hour: 'numeric', minute: '2-digit'
         });
         return `${fmt(this.startDate)} — ${fmt(this.endDate)}`;
+    }
+
+    isLiveWindow() {
+        return (Date.now() - this.endDate.getTime()) < 10 * 60 * 1000;
     }
 
     getUptimePercent() {

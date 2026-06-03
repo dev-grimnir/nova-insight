@@ -52,8 +52,9 @@ class NovaSnapshotView extends NovaBaseModalView {
         const closeBtn = this.modal.querySelector('#close-snapshot-btn');
         const modalEl  = this.modal.querySelector('#snapshot-modal');
 
-        closeBtn?.addEventListener('click', () => this.hide());
-        modalEl?.addEventListener('click', e => { if (e.target === modalEl) this.hide(); });
+        const cleanup = () => document.getElementById('snap-floating-tooltip')?.remove();
+        closeBtn?.addEventListener('click', () => { cleanup(); this.hide(); });
+        modalEl?.addEventListener('click', e => { if (e.target === modalEl) { cleanup(); this.hide(); } });
     }
 }
 

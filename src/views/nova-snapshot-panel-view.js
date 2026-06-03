@@ -30,7 +30,7 @@ class NovaSnapshotPanelView {
                         </button>
                         <div>
                             <div class="snap-panel-subtitle text-emerald-400 text-xs font-mono tracking-widest">${this.model.friendlyName || 'Customer'} — Connection Timeline</div>
-                            <div class="snap-panel-daterange text-2xl font-semibold text-white mt-1">${this.model.getDateRangeString()}</div>
+                            <div class="snap-panel-daterange text-lg font-semibold text-white mt-1">${this.model.getDateRangeString()}</div>
                         </div>
                     </div>
                     <div class="snap-panel-ribbon flex flex-col gap-1.5 shrink-0">
@@ -78,7 +78,7 @@ class NovaSnapshotPanelView {
         const backBtn   = this.container.querySelector('.snap-panel-back-btn');
 
         if (subtitle)  subtitle.textContent  = `${this.model.friendlyName || 'Customer'} — Connection Timeline`;
-        if (daterange) daterange.textContent = this.model.getDateRangeString();
+        if (daterange) { daterange.textContent = this.model.getDateRangeString(); daterange.className = 'snap-panel-daterange text-lg font-semibold text-white mt-1'; }
         if (ribbon)    ribbon.innerHTML      = this.#buildRibbon();
 
         if (backBtn) backBtn.classList.toggle('hidden', !this.controller.canGoBack());
@@ -92,17 +92,47 @@ class NovaSnapshotPanelView {
     }
 
     #attachTooltipListeners() {
-        const anchor  = this.container.querySelector('.snap-tooltip-anchor');
-        const tooltip = this.container.querySelector('.snap-tooltip');
-        if (!anchor || !tooltip) return;
+        const anchor = this.container.querySelector('.snap-tooltip-anchor');
+        if (!anchor) return;
 
-        anchor.addEventListener('mouseenter', () => tooltip.classList.remove('hidden'));
-        anchor.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
+        anchor.addEventListener('mouseenter', () => {
+            const existing = document.getElementById('snap-floating-tooltip');
+            if (existing) existing.remove();
+
+            const longList = this.model.getMetrics().longDisconnects || [];
+            const rows = longList.length === 0
+                ? '<div class="text-zinc-500 text-xs">None</div>'
+                : longList.map(d => {
+                    const fmt = (dt) => dt instanceof Date
+                        ? dt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                        : '—';
+                    const dur = d.durationSec ? formatDuration(d.durationSec) : '—';
+                    return `<div class="text-zinc-300 text-xs py-0.5 border-b border-zinc-700 last:border-0">
+                        <span class="text-zinc-500">${fmt(d.stopDate)}</span> → <span class="text-zinc-500">${fmt(d.startDate)}</span>
+                        <span class="text-red-400 ml-1">(${dur})</span>
+                    </div>`;
+                }).join('');
+
+            const tip = document.createElement('div');
+            tip.id = 'snap-floating-tooltip';
+            tip.className = 'fixed z-[9999] bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl';
+            tip.innerHTML = `<div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>${rows}`;
+            document.body.appendChild(tip);
+
+            const rect = anchor.getBoundingClientRect();
+            tip.style.left = `${Math.max(8, rect.right - tip.offsetWidth)}px`;
+            tip.style.top  = `${rect.top - tip.offsetHeight - 8}px`;
+        });
+
+        anchor.addEventListener('mouseleave', () => {
+            document.getElementById('snap-floating-tooltip')?.remove();
+        });
     }
 
     #buildRibbon() {
         const m      = this.model.getMetrics();
         const status = this.model.getCurrentStatus();
+        const isLive = this.model.isLiveWindow();
 
         const statusColor = status.isUp === null
             ? 'text-zinc-400'
@@ -114,18 +144,6 @@ class NovaSnapshotPanelView {
         };
 
         const longList = m.longDisconnects || [];
-        const longTooltipRows = longList.length === 0
-            ? '<div class="text-zinc-500 text-xs">None</div>'
-            : longList.map(d => {
-                const fmt = (dt) => dt instanceof Date
-                    ? dt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                    : '—';
-                const dur = d.durationSec ? formatDuration(d.durationSec) : '—';
-                return `<div class="text-zinc-300 text-xs py-0.5 border-b border-zinc-700 last:border-0">
-                    <span class="text-zinc-500">${fmt(d.stopDate)}</span> → <span class="text-zinc-500">${fmt(d.startDate)}</span>
-                    <span class="text-red-400 ml-1">(${dur})</span>
-                </div>`;
-            }).join('');
 
         const stat = (label, value, valueClass = 'text-white') =>
             `<div class="flex flex-col items-center px-3 py-1.5 bg-zinc-800 rounded-xl min-w-[90px]">
@@ -134,18 +152,14 @@ class NovaSnapshotPanelView {
             </div>`;
 
         const longDisconnectStat =
-            `<div class="relative snap-tooltip-anchor flex flex-col items-center px-3 py-1.5 bg-zinc-800 rounded-xl min-w-[90px] cursor-default">
+            `<div class="snap-tooltip-anchor flex flex-col items-center px-3 py-1.5 bg-zinc-800 rounded-xl min-w-[90px] cursor-default">
                 <span class="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">Long Disconnects</span>
                 <span class="text-sm font-semibold text-white">${longList.length}</span>
-                <div class="snap-tooltip hidden absolute bottom-full right-0 mb-2 z-50 bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl">
-                    <div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>
-                    ${longTooltipRows}
-                </div>
             </div>`;
 
         return `
             <div class="flex gap-2">
-                ${stat('Current Status', `${status.label}: ${status.duration}`, statusColor)}
+                ${stat(isLive ? 'Current Status' : 'End Status', `${status.label}: ${status.duration}`, statusColor)}
                 ${stat('Uptime', `${this.model.getUptimePercent()}%`, 'text-emerald-400')}
                 ${stat('Disconnects', m.disconnects ?? 'N/A')}
                 ${stat('Last Drop', m.timeSinceLastStr || 'N/A')}
