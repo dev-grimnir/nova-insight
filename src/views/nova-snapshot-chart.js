@@ -265,8 +265,10 @@ class NovaSnapshotChart {
                     decimation: { enabled: false },
                     tooltip: {
                         enabled: true,
+                        animation: false,
                         intersect: false,
-                        mode: 'index',
+                        mode: 'nearest',
+                        axis: 'x',
                         callbacks: {
                             title: (items) => {
                                 if (!items.length) return '';
