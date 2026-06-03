@@ -15,6 +15,7 @@ class NovaSnapshotChart {
 
     static #MS_PER_DAY = 86400000;
     static #MONTH_THRESHOLD_DAYS = 60;
+    static #HOUR_THRESHOLD_DAYS  = 0.05;   // ~72 min — anything at or below shows minute ticks
 
     /* ============================================================
      *  GRANULARITY + TICKS
@@ -24,7 +25,8 @@ class NovaSnapshotChart {
         const days = (endMs - startMs) / this.#MS_PER_DAY;
         if (days >= this.#MONTH_THRESHOLD_DAYS) return 'month';
         if (days > 1.01) return 'day';
-        return 'hour';
+        if (days > this.#HOUR_THRESHOLD_DAYS) return 'hour';
+        return 'minute';
     }
 
     static #monthTickValues(startMs, endMs) {
@@ -70,6 +72,17 @@ class NovaSnapshotChart {
         return ticks;
     }
 
+    static #minuteTickValues(startMs, endMs) {
+        const INTERVAL = 10 * 60 * 1000; // 10 minutes
+        const ticks = [];
+        const cursor = new Date(Math.ceil(startMs / INTERVAL) * INTERVAL);
+        while (cursor.getTime() <= endMs) {
+            ticks.push(cursor.getTime());
+            cursor.setTime(cursor.getTime() + INTERVAL);
+        }
+        return ticks;
+    }
+
     static #formatTick(ms, granularity) {
         const d = new Date(ms);
         if (granularity === 'month') {
@@ -78,7 +91,10 @@ class NovaSnapshotChart {
         if (granularity === 'day') {
             return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         }
-        return `${d.getHours().toString().padStart(2, '0')}:00`;
+        if (granularity === 'hour') {
+            return `${d.getHours().toString().padStart(2, '0')}:00`;
+        }
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     }
 
     /* ============================================================
@@ -195,9 +211,10 @@ class NovaSnapshotChart {
         const minVisibleMs = msPerPixel * 0.5;
         const periods = this.#aggregatePeriods(rawPeriods, minVisibleMs);
 
-        const tickValues = granularity === 'month' ? this.#monthTickValues(startTime, endTime)
-                         : granularity === 'day'   ? this.#dayTickValues(startTime, endTime)
-                         :                            this.#hourTickValues(startTime, endTime);
+        const tickValues = granularity === 'month'  ? this.#monthTickValues(startTime, endTime)
+                         : granularity === 'day'    ? this.#dayTickValues(startTime, endTime)
+                         : granularity === 'hour'   ? this.#hourTickValues(startTime, endTime)
+                         :                            this.#minuteTickValues(startTime, endTime);
 
         // ONE dataset. Each period is two points at the same y, separated
         // from the next period by a NaN-y point. Chart.js treats NaN y as
@@ -330,7 +347,7 @@ class NovaSnapshotChart {
      * hover state on the actual label region. Re-runs on resize.
      */
     static #mountTickClickTargets(canvas, chart, tickValues, granularity, startTime, endTime, onRangeClick) {
-        if (!onRangeClick || granularity === 'hour') return;
+        if (!onRangeClick || granularity === 'minute') return;
 
         const parent = canvas.parentElement;
         if (!parent) return;
@@ -391,9 +408,16 @@ class NovaSnapshotChart {
                     drillEnd   = new Date(drillEnd.getTime() - 1);
                     if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
                     if (drillEnd.getTime()   > endTime)   drillEnd   = new Date(endTime);
-                } else {
+                } else if (granularity === 'day') {
                     drillStart = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), 0, 0, 0, 0);
                     drillEnd   = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), 23, 59, 59, 999);
+                    if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
+                    const upperMs = Math.min(endTime, Date.now());
+                    if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
+                } else {
+                    // hour granularity → drill to that specific hour
+                    drillStart = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), clicked.getHours(), 0, 0, 0);
+                    drillEnd   = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), clicked.getHours(), 59, 59, 999);
                     if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
                     const upperMs = Math.min(endTime, Date.now());
                     if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
