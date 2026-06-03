@@ -27,6 +27,12 @@ class NovaSnapshotView extends NovaBaseModalView {
                         </button>
                     </div>
                     <div id="snapshot-content" class="flex-1 overflow-y-auto p-8 bg-[#18181b]"></div>
+                    <style>
+                        #snapshot-content::-webkit-scrollbar { width: 10px; }
+                        #snapshot-content::-webkit-scrollbar-track { background: #18181b; }
+                        #snapshot-content::-webkit-scrollbar-thumb { background: #10b981; border-radius: 9999px; border: 2px solid #18181b; }
+                        #snapshot-content::-webkit-scrollbar-thumb:hover { background: #34d399; }
+                    </style>
                 </div>
             </div>
         `;
