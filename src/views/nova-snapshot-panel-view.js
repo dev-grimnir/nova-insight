@@ -115,7 +115,7 @@ class NovaSnapshotPanelView {
 
             const tip = document.createElement('div');
             tip.id = 'snap-floating-tooltip';
-            tip.className = 'fixed z-[9999] bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl';
+            tip.className = 'fixed z-[10100] bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl';
             tip.innerHTML = `<div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>${rows}`;
             document.body.appendChild(tip);
 
