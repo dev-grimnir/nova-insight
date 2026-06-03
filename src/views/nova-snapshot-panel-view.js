@@ -95,9 +95,11 @@ class NovaSnapshotPanelView {
         const anchor = this.container.querySelector('.snap-tooltip-anchor');
         if (!anchor) return;
 
-        anchor.addEventListener('mouseenter', () => {
-            const existing = document.getElementById('snap-floating-tooltip');
-            if (existing) existing.remove();
+        let hideTimer = null;
+
+        const showTooltip = () => {
+            clearTimeout(hideTimer);
+            if (document.getElementById('snap-floating-tooltip')) return;
 
             const longList = this.model.getMetrics().longDisconnects || [];
             const rows = longList.length === 0
@@ -115,18 +117,37 @@ class NovaSnapshotPanelView {
 
             const tip = document.createElement('div');
             tip.id = 'snap-floating-tooltip';
+            tip.innerHTML = `
+                <style>
+                    #snap-floating-tooltip::-webkit-scrollbar { width: 7px; }
+                    #snap-floating-tooltip::-webkit-scrollbar-track { background: #18181b; border-radius: 9999px; }
+                    #snap-floating-tooltip::-webkit-scrollbar-thumb { background: #34d399; border-radius: 9999px; border: 2px solid #18181b; }
+                    #snap-floating-tooltip::-webkit-scrollbar-thumb:hover { background: #10b981; }
+                </style>
+                <div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>
+                ${rows}
+            `;
             tip.className = 'fixed z-[10100] bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl';
-            tip.innerHTML = `<div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>${rows}`;
+            tip.style.scrollbarWidth = 'thin';
+            tip.style.scrollbarColor = '#34d399 #18181b';
             document.body.appendChild(tip);
 
             const rect = anchor.getBoundingClientRect();
             tip.style.left = `${Math.max(8, rect.right - tip.offsetWidth)}px`;
-            tip.style.top  = `${rect.top - tip.offsetHeight - 8}px`;
-        });
+            tip.style.top  = `${rect.bottom}px`;
 
-        anchor.addEventListener('mouseleave', () => {
-            document.getElementById('snap-floating-tooltip')?.remove();
-        });
+            tip.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+            tip.addEventListener('mouseleave', hideTooltip);
+        };
+
+        const hideTooltip = () => {
+            hideTimer = setTimeout(() => {
+                document.getElementById('snap-floating-tooltip')?.remove();
+            }, 80);
+        };
+
+        anchor.addEventListener('mouseenter', showTooltip);
+        anchor.addEventListener('mouseleave', hideTooltip);
     }
 
     #buildRibbon() {
