@@ -109,8 +109,8 @@ class NovaSnapshotPanelView {
                         ? dt.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                         : '—';
                     const dur = d.durationSec ? formatDuration(d.durationSec) : '—';
-                    return `<div class="text-zinc-300 text-xs py-0.5 border-b border-zinc-700 last:border-0">
-                        <span class="text-zinc-500">${fmt(d.stopDate)}</span> → <span class="text-zinc-500">${fmt(d.startDate)}</span>
+                    return `<div class="text-white text-xs py-0.5 border-b border-zinc-700 last:border-0 whitespace-nowrap">
+                        ${fmt(d.stopDate)} → ${fmt(d.startDate)}
                         <span class="text-red-400 ml-1">(${dur})</span>
                     </div>`;
                 }).join('');
@@ -127,7 +127,7 @@ class NovaSnapshotPanelView {
                 <div class="text-[10px] font-mono text-zinc-500 tracking-widest uppercase mb-2">Outages &gt; 30 min</div>
                 ${rows}
             `;
-            tip.className = 'fixed z-[10100] bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-72 text-left shadow-2xl';
+            tip.className = 'fixed z-[10100] bg-zinc-900 border border-zinc-600 rounded-xl p-3 max-h-48 overflow-y-auto w-96 text-left shadow-2xl';
             tip.style.scrollbarWidth = 'thin';
             tip.style.scrollbarColor = '#34d399 #18181b';
             document.body.appendChild(tip);
