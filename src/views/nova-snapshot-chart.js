@@ -269,19 +269,25 @@ class NovaSnapshotChart {
                         intersect: false,
                         mode: 'nearest',
                         axis: 'x',
+                        filter: (item) => !isNaN(item.parsed.y),
                         callbacks: {
                             title: (items) => {
                                 if (!items.length) return '';
-                                return new Date(items[0].parsed.x).toLocaleString([], {
+                                const cursorMs = items[0].chart.scales.x.getValueForPixel(
+                                    items[0].chart.tooltip.caretX
+                                );
+                                return new Date(cursorMs).toLocaleString([], {
                                     month: 'short', day: 'numeric',
                                     hour: 'numeric', minute: '2-digit'
                                 });
                             },
                             label: (ctx) => {
-                                if (ctx.parsed.y === 0) return "";
-
-                                const currentX = ctx.parsed.x;
-                                const period = periods.find(p => currentX >= p.startMs && currentX <= p.endMs);
+                                const cursorMs = ctx.chart.scales.x.getValueForPixel(
+                                    ctx.chart.tooltip.caretX
+                                );
+                                const period = periods.find(p =>
+                                    cursorMs >= p.startMs && cursorMs <= p.endMs
+                                );
                                 if (!period) return '';
 
                                 const fmt = (ms) => new Date(ms).toLocaleString([], {
@@ -298,14 +304,15 @@ class NovaSnapshotChart {
                                 return `${label} — ${fmt(period.startMs)} to ${fmt(period.endMs)} (${durStr})`;
                             },
                             labelColor: (ctx) => {
-                                if (ctx.parsed.y === 0) return null;
-                                const period = periods.find(p => ctx.parsed.x >= p.startMs && ctx.parsed.x <= p.endMs);
+                                const cursorMs = ctx.chart.scales.x.getValueForPixel(
+                                    ctx.chart.tooltip.caretX
+                                );
+                                const period = periods.find(p =>
+                                    cursorMs >= p.startMs && cursorMs <= p.endMs
+                                );
                                 if (!period) return null;
                                 const color = period.isConnected ? '#10b981' : '#ef4444';
-                                return {
-                                    borderColor: color,
-                                    backgroundColor: color
-                                };
+                                return { borderColor: color, backgroundColor: color };
                             },
                         }
                     }
