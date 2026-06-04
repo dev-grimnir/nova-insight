@@ -263,58 +263,7 @@ class NovaSnapshotChart {
                 plugins: {
                     legend: { display: false },
                     decimation: { enabled: false },
-                    tooltip: {
-                        enabled: true,
-                        animation: false,
-                        intersect: false,
-                        mode: 'nearest',
-                        axis: 'x',
-                        filter: (item) => !isNaN(item.parsed.y),
-                        callbacks: {
-                            title: (items) => {
-                                if (!items.length) return '';
-                                const cursorMs = items[0].chart.scales.x.getValueForPixel(
-                                    items[0].chart.tooltip.caretX
-                                );
-                                return new Date(cursorMs).toLocaleString([], {
-                                    month: 'short', day: 'numeric',
-                                    hour: 'numeric', minute: '2-digit'
-                                });
-                            },
-                            label: (ctx) => {
-                                const cursorMs = ctx.chart.scales.x.getValueForPixel(
-                                    ctx.chart.tooltip.caretX
-                                );
-                                const period = periods.find(p =>
-                                    cursorMs >= p.startMs && cursorMs <= p.endMs
-                                );
-                                if (!period) return '';
-
-                                const fmt = (ms) => new Date(ms).toLocaleString([], {
-                                    month: 'short', day: 'numeric',
-                                    hour: 'numeric', minute: '2-digit'
-                                });
-
-                                const durMs  = period.endMs - period.startMs;
-                                const hours  = Math.floor(durMs / 3600000);
-                                const mins   = Math.floor((durMs % 3600000) / 60000);
-                                const durStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-
-                                const label = period.isConnected ? 'Connected' : 'Disconnected';
-                                return `${label} — ${fmt(period.startMs)} to ${fmt(period.endMs)} (${durStr})`;
-                            },
-                            labelColor: (ctx) => {
-                                const cursorMs = ctx.chart.scales.x.getValueForPixel(
-                                    ctx.chart.tooltip.caretX
-                                );
-                                const period = periods.find(p =>
-                                    cursorMs >= p.startMs && cursorMs <= p.endMs
-                                );
-                                if (!period) return null;
-                                const color = period.isConnected ? '#10b981' : '#ef4444';
-                                return { borderColor: color, backgroundColor: color };
-                            },
-                        }
+                    tooltip: { enabled: false },
                     }
                 },
                 scales: {
@@ -351,7 +300,75 @@ class NovaSnapshotChart {
             this.#mountTickClickTargets(canvas, chart, tickValues, granularity, startTime, endTime, onRangeClick);
         }, 100);
 
+        this.#mountCustomTooltip(canvas, chart, periods);
+
         return { chart, periods };
+    }
+
+    static #mountCustomTooltip(canvas, chart, periods) {
+        const TIP_ID = 'snap-chart-tooltip';
+
+        const fmt = (ms) => new Date(ms).toLocaleString([], {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        });
+
+        const hide = () => document.getElementById(TIP_ID)?.remove();
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const area   = chart.chartArea;
+            if (!area || mouseX < area.left || mouseX > area.right) { hide(); return; }
+
+            const cursorMs = chart.scales.x.getValueForPixel(mouseX);
+            const period   = periods.find(p => cursorMs >= p.startMs && cursorMs <= p.endMs);
+            if (!period) { hide(); return; }
+
+            const durMs  = period.endMs - period.startMs;
+            const hours  = Math.floor(durMs / 3600000);
+            const mins   = Math.floor((durMs % 3600000) / 60000);
+            const durStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+            const label  = period.isConnected ? 'Connected' : 'Disconnected';
+            const color  = period.isConnected ? '#10b981' : '#ef4444';
+            const title  = new Date(cursorMs).toLocaleString([], {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            });
+
+            let tip = document.getElementById(TIP_ID);
+            if (!tip) {
+                tip = document.createElement('div');
+                tip.id = TIP_ID;
+                tip.style.cssText = `
+                    position: fixed; z-index: 10200; pointer-events: none;
+                    background: #27272a; border: 1px solid #3f3f46;
+                    border-radius: 0.5rem; padding: 0.5rem 0.75rem;
+                    font-size: 0.8rem; color: #e5e7eb;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+                    white-space: nowrap;
+                `;
+                document.body.appendChild(tip);
+            }
+
+            tip.innerHTML = `
+                <div style="font-weight:600;margin-bottom:3px;">${title}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${color};border:1px solid ${color};flex-shrink:0;"></span>
+                    <span>${label} — ${fmt(period.startMs)} to ${fmt(period.endMs)} (${durStr})</span>
+                </div>
+            `;
+
+            const pad = 12;
+            const tw  = tip.offsetWidth;
+            const th  = tip.offsetHeight;
+            let tx = e.clientX + pad;
+            let ty = e.clientY - th - pad;
+            if (tx + tw > window.innerWidth  - 8) tx = e.clientX - tw - pad;
+            if (ty < 8) ty = e.clientY + pad;
+            tip.style.left = `${tx}px`;
+            tip.style.top  = `${ty}px`;
+        });
+
+        canvas.addEventListener('mouseleave', hide);
     }
 
     /**
