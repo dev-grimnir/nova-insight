@@ -324,10 +324,20 @@ class NovaSnapshotChart {
             var area    = chart.chartArea;
             if (!area || mouseX < area.left || mouseX > area.right) { hide(); return; }
 
-            var cursorMs = chart.scales.x.getValueForPixel(mouseX);
-            var period   = null;
+            // Direct linear interpolation — avoids any Chart.js internal
+            // pixel/value translation artifacts.
+            var xScale  = chart.scales.x;
+            var pxLeft  = xScale.left;
+            var pxRight = xScale.right;
+            var t       = (mouseX - pxLeft) / (pxRight - pxLeft);
+            var cursorMs = xScale.min + t * (xScale.max - xScale.min);
+
+            // Exclusive-end boundary so the cursor at a period transition
+            // resolves to the later (newer) period, not the outgoing one.
+            var period = null;
             for (var i = 0; i < periods.length; i++) {
-                if (cursorMs >= periods[i].startMs && cursorMs <= periods[i].endMs) {
+                var isLast = (i === periods.length - 1);
+                if (cursorMs >= periods[i].startMs && (isLast ? cursorMs <= periods[i].endMs : cursorMs < periods[i].endMs)) {
                     period = periods[i]; break;
                 }
             }
