@@ -375,6 +375,10 @@ class NovaAnalyzer {
             totalResultsCounted: totalResultsCounted || 0,
             ignoredAsDuplicates: ignoredAsDuplicates || 0,
 
+            // Final connection state at end of window
+            finalState:       counters.currentState,
+            lastTransitionMs: counters.lastTransitionTime,
+
             // Monthly bar chart (NEW)
             monthlyBuckets
         };

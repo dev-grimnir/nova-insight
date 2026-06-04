@@ -156,16 +156,8 @@ class NovaReportView extends NovaBaseModalView {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-zinc-700 text-sm">
-                                <tr><td class="p-6 text-zinc-200">Total Disconnects</td><td class="p-6 text-right font-mono text-white">${this.metrics.disconnects || 0}</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Average Session Duration</td><td class="p-6 text-right text-white">${this.metrics.avgSessionMin !== 'N/A' ? formatDuration(this.metrics.avgSessionMin * 60) : 'N/A'}</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Average Reconnect Time</td><td class="p-6 text-right text-white">${this.metrics.avgReconnectMin !== 'N/A' ? formatDuration(this.metrics.avgReconnectMin * 60) : 'N/A'}</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Percent Connected</td><td class="p-6 text-right text-white">${Number(this.metrics.percentConnected || 0).toFixed(1)}%</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Business Hours Disconnects</td><td class="p-6 text-right text-white">${this.metrics.businessDisconnects || 0}</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Off-Hours Disconnects</td><td class="p-6 text-right text-white">${this.metrics.offHoursDisconnects || 0}</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Time Since Last Disconnect</td><td class="p-6 text-right text-white">${this.metrics.timeSinceLastStr || 'N/A'}</td></tr>
                                 <tr><td class="p-6 text-zinc-200">Peak Disconnect Hour</td><td class="p-6 text-right text-white">${this.metrics.peakHourStr || 'None'}</td></tr>
                                 <tr><td class="p-6 text-zinc-200">Peak Disconnect Day</td><td class="p-6 text-right text-white">${this.metrics.peakDayStr || 'None'}</td></tr>
-                                <tr><td class="p-6 text-zinc-200">Longest Session</td><td class="p-6 text-right text-white">${this.metrics.longestSessionMin ? formatDuration(this.metrics.longestSessionMin * 60) : 'N/A'}</td></tr>
                                 <tr><td class="p-6 text-zinc-200">Shortest Session</td><td class="p-6 text-right text-white">${this.metrics.shortestSessionMin !== 'N/A' ? formatDuration(this.metrics.shortestSessionMin * 60) : 'N/A'}</td></tr>
                                 <tr><td class="p-6 text-zinc-200">Median Reconnect Time</td><td class="p-6 text-right text-white">${this.metrics.medianReconnectMin !== 'N/A' ? formatDuration(this.metrics.medianReconnectMin * 60) : 'N/A'}</td></tr>
                             </tbody>
@@ -254,7 +246,29 @@ class NovaReportView extends NovaBaseModalView {
     }
 
     exportToCSV() {
-        const csv = this.generateCsvContent();
+        const m = this.metrics;
+        const fmtMin = (v) => v !== 'N/A' && v != null ? formatDuration(Number(v) * 60) : 'N/A';
+        let csv = `RADIUS Connection Report — ${this.friendlyName || this.username}\n`;
+        csv += `Monitoring Period,${m.monitoringPeriod || 'N/A'}\n\n`;
+        csv += `Metric,Value\n`;
+        csv += `Uptime,${Number(m.percentConnected || 0).toFixed(1)}%\n`;
+        csv += `Total Disconnects,${m.disconnects || 0}\n`;
+        csv += `Business Hours Disconnects,${m.businessDisconnects || 0}\n`;
+        csv += `Off-Hours Disconnects,${m.offHoursDisconnects || 0}\n`;
+        csv += `Time Since Last Disconnect,${m.timeSinceLastStr || 'N/A'}\n`;
+        csv += `Average Session Duration,${fmtMin(m.avgSessionMin)}\n`;
+        csv += `Longest Session,${fmtMin(m.longestSessionMin)}\n`;
+        csv += `Shortest Session,${fmtMin(m.shortestSessionMin)}\n`;
+        csv += `Average Reconnect Time,${fmtMin(m.avgReconnectMin)}\n`;
+        csv += `Median Reconnect Time,${fmtMin(m.medianReconnectMin)}\n`;
+        csv += `Peak Disconnect Hour,${m.peakHourStr || 'None'}\n`;
+        csv += `Peak Disconnect Day,${m.peakDayStr || 'None'}\n`;
+        if (this.longDisconnects.length > 0) {
+            csv += `\nLong Disconnects (>30 min)\nDisconnected At,Reconnected At,Duration\n`;
+            this.longDisconnects.forEach(ld => {
+                csv += `${ld.stopDate.toLocaleString()},${ld.startDate.toLocaleString()},${formatDuration(ld.durationSec)}\n`;
+            });
+        }
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -262,51 +276,157 @@ class NovaReportView extends NovaBaseModalView {
         a.click();
     }
 
+    #captureChartImages() {
+        const snapshotCanvas = this.modal.querySelector('#inline-snapshot-slot canvas');
+        const hourlyCanvas   = this.modal.querySelector('#hourlyChart');
+        return {
+            snapshotImg: snapshotCanvas ? snapshotCanvas.toDataURL('image/png') : null,
+            hourlyData:  this.metrics.hourlyDisconnects || Array(24).fill(0)
+        };
+    }
+
     exportToHTML() {
-        const reportHTML = this.generateReportHTML();
-        const fullHTML = `<!DOCTYPE html><html><head><title>RADIUS Report</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-zinc-950 text-white">${reportHTML}</body></html>`;
-        const blob = new Blob([fullHTML], { type: 'text/html' });
+        const { snapshotImg, hourlyData } = this.#captureChartImages();
+        const html = this.#generateExportDocument(snapshotImg, hourlyData);
+        const blob = new Blob([html], { type: 'text/html' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `${this.username || 'radius'}_report.html`;
         a.click();
     }
 
-    async exportToPDF() {
-        if (typeof html2canvas === 'undefined' || typeof jsPDF === 'undefined') {
-            alert('PDF libraries not loaded – contact dev if this persists');
-            return;
-        }
-        const content = this.modal.querySelector('#report-content');
-        const canvas = await html2canvas(content, { scale: 2 });
-        const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = pdf.internal.pageSize.getWidth();
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-        pdf.save(`${this.username || 'radius'}_report.pdf`);
+    exportToPDF() {
+        const { snapshotImg, hourlyData } = this.#captureChartImages();
+        const html = this.#generateExportDocument(snapshotImg, hourlyData);
+        const win = window.open('', '_blank');
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 600);
     }
 
-    generateCsvContent() {
-        let csv = 'Metric,Value\n';
-        csv += `Total Disconnects,${this.metrics.disconnects || 0}\n`;
-        csv += `Average Session Duration,${this.metrics.avgSessionMin !== 'N/A' ? formatDuration(this.metrics.avgSessionMin * 60) : 'N/A'}\n`;
-        csv += `Average Reconnect Time,${this.metrics.avgReconnectMin !== 'N/A' ? formatDuration(this.metrics.avgReconnectMin * 60) : 'N/A'}\n`;
-        csv += `Percent Connected,${Number(this.metrics.percentConnected || 0).toFixed(1)}%\n`;
-        csv += `Business Hours Disconnects,${this.metrics.businessDisconnects || 0}\n`;
-        csv += `Off-Hours Disconnects,${this.metrics.offHoursDisconnects || 0}\n`;
-        csv += `Time Since Last Disconnect,${this.metrics.timeSinceLastStr || 'N/A'}\n`;
-        csv += `Peak Disconnect Hour,${this.metrics.peakHourStr || 'None'}\n`;
-        csv += `Peak Disconnect Day,${this.metrics.peakDayStr || 'None'}\n`;
-        csv += `Median Reconnect Time,${this.metrics.medianReconnectMin !== 'N/A' ? formatDuration(this.metrics.medianReconnectMin * 60) : 'N/A'}\n`;
-        csv += '\nLong Disconnects\nDisconnected At,Reconnected At,Duration\n';
-        this.longDisconnects.forEach(ld => {
-            csv += `${ld.stopDate.toLocaleString()},${ld.startDate.toLocaleString()},${formatDuration(ld.durationSec)}\n`;
-        });
-        return csv;
+    #generateExportDocument(snapshotImg, hourlyData) {
+        const m = this.metrics;
+        const accent = '#10b981';
+        const fmtMin = (v) => v !== 'N/A' && v != null ? formatDuration(Number(v) * 60) : 'N/A';
+
+        const snapshotSection = snapshotImg
+            ? `<img src="${snapshotImg}" style="width:100%;border-radius:1rem;display:block;">`
+            : `<p style="color:#71717a;text-align:center;padding:3rem 0;">Connection timeline unavailable.</p>`;
+
+        const longDisconnRows = this.longDisconnects.length === 0
+            ? `<tr><td colspan="3" style="padding:1.5rem;color:#71717a;text-align:center;">None</td></tr>`
+            : this.longDisconnects.map(ld => `
+                <tr>
+                    <td style="padding:1rem 1.5rem;color:#e4e4e7;">${ld.stopDate.toLocaleString()}</td>
+                    <td style="padding:1rem 1.5rem;color:#e4e4e7;">${ld.startDate.toLocaleString()}</td>
+                    <td style="padding:1rem 1.5rem;text-align:right;color:#f87171;font-weight:600;">${formatDuration(ld.durationSec)}</td>
+                </tr>`).join('');
+
+        const statRow = (label, value) =>
+            `<tr><td style="padding:1rem 1.5rem;color:#d4d4d8;">${label}</td><td style="padding:1rem 1.5rem;text-align:right;color:#fff;">${value}</td></tr>`;
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RADIUS Report — ${this.friendlyName || this.username}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #09090b; color: #fff; font-family: system-ui, sans-serif; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 3rem 2rem; }
+  .section { margin-bottom: 3rem; }
+  h1 { font-size: 2rem; font-weight: 600; }
+  h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 1.25rem; }
+  .label { font-size: 0.65rem; font-family: monospace; letter-spacing: 0.1em; text-transform: uppercase; color: ${accent}; margin-bottom: 0.25rem; }
+  .card { background: #18181b; border: 1px solid #3f3f46; border-radius: 1rem; overflow: hidden; }
+  .card-pad { padding: 2rem; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #27272a; border-bottom: 1px solid #3f3f46; }
+  th { padding: 1rem 1.5rem; text-align: left; color: #a1a1aa; font-weight: 500; font-size: 0.875rem; }
+  tbody tr { border-bottom: 1px solid #3f3f46; }
+  tbody tr:last-child { border-bottom: none; }
+  .header { background: #09090b; border-bottom: 1px solid #27272a; padding: 2rem; margin-bottom: 3rem; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="label">RADIUS Connection Report</div>
+  <h1>${this.friendlyName || this.username}</h1>
+  <div style="color:#71717a;margin-top:0.4rem;font-size:0.9rem;">${m.monitoringPeriod || 'N/A'}</div>
+</div>
+<div class="page">
+
+  <div class="section">
+    <h2>Connection Timeline</h2>
+    <div class="card card-pad">${snapshotSection}</div>
+  </div>
+
+  <div class="section">
+    <h2>Disconnects by Hour of Day</h2>
+    <div class="card card-pad" style="height:300px;">
+      <canvas id="exportHourlyChart"></canvas>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Key Statistics</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>Metric</th><th style="text-align:right;">Value</th></tr></thead>
+        <tbody>
+          ${statRow('Uptime', `${Number(m.percentConnected || 0).toFixed(1)}%`)}
+          ${statRow('Total Disconnects', m.disconnects || 0)}
+          ${statRow('Business Hours Disconnects', m.businessDisconnects || 0)}
+          ${statRow('Off-Hours Disconnects', m.offHoursDisconnects || 0)}
+          ${statRow('Time Since Last Disconnect', m.timeSinceLastStr || 'N/A')}
+          ${statRow('Average Session Duration', fmtMin(m.avgSessionMin))}
+          ${statRow('Longest Session', fmtMin(m.longestSessionMin))}
+          ${statRow('Shortest Session', fmtMin(m.shortestSessionMin))}
+          ${statRow('Average Reconnect Time', fmtMin(m.avgReconnectMin))}
+          ${statRow('Median Reconnect Time', fmtMin(m.medianReconnectMin))}
+          ${statRow('Peak Disconnect Hour', m.peakHourStr || 'None')}
+          ${statRow('Peak Disconnect Day', m.peakDayStr || 'None')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Long Disconnects (&gt;30 min)</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>Disconnected At</th><th>Reconnected At</th><th style="text-align:right;">Duration</th></tr></thead>
+        <tbody>${longDisconnRows}</tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<script>
+  new Chart(document.getElementById('exportHourlyChart'), {
+    type: 'bar',
+    data: {
+      labels: ${JSON.stringify(Array.from({ length: 24 }, (_, i) => `${i}:00`))},
+      datasets: [{ label: 'Disconnects', data: ${JSON.stringify(hourlyData)}, backgroundColor: '${accent}' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { displayColors: false, backgroundColor: '#27272a', titleColor: '#e5e7eb', bodyColor: '#e5e7eb', borderColor: '${accent}', borderWidth: 1 }
+      },
+      scales: { y: { beginAtZero: true, grid: { color: '#27272a' } }, x: { grid: { color: '#27272a' } } }
+    }
+  });
+</script>
+</body>
+</html>`;
     }
 
-    /* ============================================================
+/* ============================================================
      *  CHART.JS LOADING + CLEANUP
      * ============================================================ */
 
