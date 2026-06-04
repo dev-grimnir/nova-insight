@@ -263,8 +263,7 @@ class NovaSnapshotChart {
                 plugins: {
                     legend: { display: false },
                     decimation: { enabled: false },
-                    tooltip: { enabled: false },
-                    }
+                    tooltip: { enabled: false }
                 },
                 scales: {
                     x: {
