@@ -166,6 +166,9 @@ class NovaSnapshotPanelView {
 
         const longList = m.longDisconnects || [];
 
+        const uptime = parseFloat(this.model.getUptimePercent());
+        const uptimeColor = uptime >= 75 ? 'text-emerald-400' : uptime >= 60 ? 'text-yellow-400' : 'text-red-400';
+
         const stat = (label, value, valueClass = 'text-white') =>
             `<div class="flex flex-col items-center px-3 py-1.5 bg-zinc-800 rounded-xl min-w-[90px]">
                 <span class="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">${label}</span>
@@ -181,7 +184,7 @@ class NovaSnapshotPanelView {
         return `
             <div class="flex gap-2">
                 ${stat(isLive ? 'Current Status' : 'End Status', `${status.label}: ${status.duration}`, statusColor)}
-                ${stat('Uptime', `${this.model.getUptimePercent()}%`, 'text-emerald-400')}
+                ${stat('Uptime', `${this.model.getUptimePercent()}%`, uptimeColor)}
                 ${stat('Disconnects', m.disconnects ?? 'N/A')}
                 ${stat('Last Drop', m.timeSinceLastStr || 'N/A')}
                 ${longDisconnectStat}
