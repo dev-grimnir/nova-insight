@@ -9,7 +9,7 @@
  */
 class NovaSnapshotPanelView {
 
-    static CHART_HEIGHT_PX = 320;
+    static CHART_HEIGHT_PX = 260;
 
     #chartInstance = null;
 

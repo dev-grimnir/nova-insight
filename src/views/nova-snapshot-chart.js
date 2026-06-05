@@ -206,9 +206,11 @@ class NovaSnapshotChart {
         const rawPeriods = this.#buildPeriods(sortedEvents, endTime);
         const granularity = this.#getGranularity(startTime, endTime);
 
-        // Estimate the canvas's visible pixel width. We don't have it before
-        // the chart mounts, so use the canvas's CSS size or fall back to 1200.
-        const canvasWidth = canvas.clientWidth || canvas.width || 1200;
+        // Estimate the canvas's visible pixel width. The canvas itself hasn't
+        // been sized by Chart.js yet (that happens during new Chart()), so read
+        // from the parent container which already has its layout width. Fall
+        // back to the canvas's own size, then a safe default.
+        const canvasWidth = canvas.parentElement?.clientWidth || canvas.clientWidth || 1200;
         const rangeMs = endTime - startTime;
         const msPerPixel = rangeMs / canvasWidth;
         // Aggregate periods narrower than half a pixel — invisible anyway.
@@ -290,7 +292,7 @@ class NovaSnapshotChart {
                         }
                     }
                 },
-                layout: { padding: { right: 40, left: 20, top: 30, bottom: 20 } }
+                layout: { padding: { right: 40, left: 20, top: 10, bottom: 20 } }
             }
         });
 
