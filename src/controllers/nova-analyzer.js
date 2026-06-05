@@ -25,12 +25,6 @@ class NovaAnalyzer {
      *  BOUNDARY HANDLING
      * ============================================================ */
 
-    /**
-     * When the first real log entry lands after requestedStart we have no
-     * record of the prior state, so we inject an opposite-status entry at
-     * the exact boundary. Trailing boundary is handled in #calculateEndTime
-     * via a pure delta (no entry injection).
-     */
     static #computeLeadTime(normalized, requestedStart) {
         if (!requestedStart || !(requestedStart instanceof Date) || isNaN(requestedStart.getTime())) {
             console.error('NovaAnalyzer: requestedStart is required and must be a valid Date');
@@ -55,12 +49,6 @@ class NovaAnalyzer {
         return normalized;
     }
 
-    /**
-     * If the final state is "up", the tail of the window (lastTransitionTime → requestedEnd)
-     * is added as a connected session AND as a connectedInterval so monthly buckets see it.
-     * If the final state is "down", the tail is a disconnect; record it as a long outage
-     * if > 30 minutes, matching #processAllEntries behavior.
-     */
     static #calculateEndTime(counters, requestedEnd) {
         if (!requestedEnd || !(requestedEnd instanceof Date) || isNaN(requestedEnd.getTime())) {
             console.error('NovaAnalyzer: requestedEnd is required and must be a valid Date');
@@ -101,23 +89,18 @@ class NovaAnalyzer {
             sessionSeconds: [],
             reconnectSeconds: [],
             longDisconnects: [],
-            connectedIntervals: [],          // feeds #computeMonthlyBuckets
+            connectedIntervals: [],
             firstDate: null,
             lastDate: null,
             lastDisconnectDate: null,
             hourlyDisconnects: Array(24).fill(0),
             hourlyCount: Array(24).fill(0),
-            dailyCount: {},                  // feeds peak-day in #computePeakMetrics
+            dailyCount: {},
             currentState: null,
             lastTransitionTime: null
         };
     }
 
-    /**
-     * Single pass state machine. Closes an up-interval (pushes both sessionSeconds
-     * and connectedIntervals) on every up→down transition. Long outages > 30 min
-     * are captured on every down→up transition.
-     */
     static #processAllEntries(entries, counters) {
         entries.forEach(entry => {
             const date = entry.dateObj;
@@ -264,14 +247,6 @@ class NovaAnalyzer {
      *  MONTHLY BUCKETS
      * ============================================================ */
 
-    /**
-     * Walks calendar months across [requestedStart, requestedEnd] and
-     * computes connected/disconnected seconds for each, clipping partial
-     * months at the boundaries to the actual requested range.
-     *
-     * A March bar on a Mar 15 – Nov 22 report reflects Mar 15–31 only.
-     * Tooltips and drill-down should use startDate/endDate from each bucket.
-     */
     static #computeMonthlyBuckets(connectedIntervals, requestedStart, requestedEnd) {
         if (!requestedStart || !requestedEnd) return [];
 
@@ -284,7 +259,7 @@ class NovaAnalyzer {
 
         while (true) {
             const calStart = new Date(year, month,     1, 0, 0, 0, 0).getTime();
-            const calEnd   = new Date(year, month + 1, 1, 0, 0, 0, 0).getTime(); // exclusive
+            const calEnd   = new Date(year, month + 1, 1, 0, 0, 0, 0).getTime();
 
             if (calStart >= reqEnd) break;
 
@@ -300,12 +275,12 @@ class NovaAnalyzer {
                     const oEnd   = Math.min(iv.endMs,   endMs);
                     if (oEnd > oStart) connectedSec += (oEnd - oStart) / 1000;
                 }
-                connectedSec = Math.min(connectedSec, totalSec);  // clamp FP slop
+                connectedSec = Math.min(connectedSec, totalSec);
                 const disconnectedSec = totalSec - connectedSec;
 
                 buckets.push({
                     year,
-                    month,                                // 0-indexed
+                    month,
                     startDate: new Date(startMs),
                     endDate:   new Date(endMs),
                     connectedSec,
@@ -340,42 +315,31 @@ class NovaAnalyzer {
         } = parts;
 
         return {
-            // Peak
             peakHourStr:         peakMetrics.peakHourStr,
             peakDayStr:          peakMetrics.peakDayStr,
             businessDisconnects: peakMetrics.businessDisconnects,
             offHoursDisconnects: peakMetrics.offHoursDisconnects,
-
-            // Time
             timeSinceLastStr: timeSinceLast.timeSinceLastStr,
             monitoringPeriod: uptimeMetrics.firstDate && uptimeMetrics.lastDate
                 ? `${uptimeMetrics.firstDate.toLocaleString()} to ${uptimeMetrics.lastDate.toLocaleString()}`
                 : 'N/A',
             daysSpanned: uptimeMetrics.daysSpanned,
-
-            // Uptime
             totalConnectedSec:    uptimeMetrics.totalConnectedSec,
             totalDisconnectedSec: uptimeMetrics.totalDisconnectedSec,
             percentConnected:     uptimeMetrics.percentConnected,
-
-            // Sessions
             avgSessionMin:      sessionMetrics.avgSessionMin,
             longestSessionMin:  sessionMetrics.longestSessionMin,
             shortestSessionMin: sessionMetrics.shortestSessionMin,
-
-            // Reconnects
             avgReconnectMin:    reconnectMetrics.avgReconnectMin,
             medianReconnectMin: reconnectMetrics.medianReconnectMin,
-
-            // Counts
             disconnects:         counters.disconnects,
             longDisconnects:     counters.longDisconnects,
             hourlyDisconnects:   counters.hourlyDisconnects,
             dailyCount:          counters.dailyCount,
             totalResultsCounted: totalResultsCounted || 0,
             ignoredAsDuplicates: ignoredAsDuplicates || 0,
-
-            // Monthly bar chart (NEW)
+            finalState:       counters.currentState,
+            lastTransitionMs: counters.lastTransitionTime,
             monthlyBuckets
         };
     }

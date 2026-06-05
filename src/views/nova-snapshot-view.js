@@ -20,13 +20,19 @@ class NovaSnapshotView extends NovaBaseModalView {
 
         const modalHTML = `
             <div id="snapshot-modal" class="fixed inset-0 bg-black/85 flex items-center justify-center z-[10001] opacity-0 transition-opacity duration-400">
-                <div class="bg-[#18181b] border border-[#27272a] rounded-3xl w-[1280px] max-w-[96vw] max-h-[96vh] overflow-hidden shadow-2xl flex flex-col transform scale-95 transition-all duration-500">
+                <div id="snapshot-modal-box" class="bg-[#18181b] border border-[#27272a] rounded-3xl w-[1280px] max-w-[96vw] max-h-[96vh] overflow-hidden shadow-2xl flex flex-col transition-transform duration-300" style="transform:scale(0.95)">
                     <div class="px-8 py-4 border-b border-[#27272a] bg-[#09090b] flex-shrink-0 flex items-center justify-end">
                         <button id="close-snapshot-btn" class="px-6 py-2.5 text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl flex items-center gap-2 transition">
                             ✕ Close
                         </button>
                     </div>
                     <div id="snapshot-content" class="flex-1 overflow-y-auto p-8 bg-[#18181b]"></div>
+                    <style>
+                        #snapshot-content::-webkit-scrollbar { width: 10px; }
+                        #snapshot-content::-webkit-scrollbar-track { background: #18181b; }
+                        #snapshot-content::-webkit-scrollbar-thumb { background: #10b981; border-radius: 9999px; border: 2px solid #18181b; }
+                        #snapshot-content::-webkit-scrollbar-thumb:hover { background: #34d399; }
+                    </style>
                 </div>
             </div>
         `;
@@ -39,9 +45,12 @@ class NovaSnapshotView extends NovaBaseModalView {
             this.#attachListeners();
 
             const modalOverlay = this.modal.querySelector('#snapshot-modal');
-            if (modalOverlay) {
-                modalOverlay.style.opacity = '1';
-                modalOverlay.style.transform = 'scale(1)';
+            const modalBox     = this.modal.querySelector('#snapshot-modal-box');
+            if (modalOverlay) modalOverlay.style.opacity = '1';
+            if (modalBox) {
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    modalBox.style.transform = 'scale(1)';
+                }));
             }
         }).catch(err => {
             console.error('Snapshot modal creation failed:', err);
@@ -52,8 +61,9 @@ class NovaSnapshotView extends NovaBaseModalView {
         const closeBtn = this.modal.querySelector('#close-snapshot-btn');
         const modalEl  = this.modal.querySelector('#snapshot-modal');
 
-        closeBtn?.addEventListener('click', () => this.hide());
-        modalEl?.addEventListener('click', e => { if (e.target === modalEl) this.hide(); });
+        const cleanup = () => document.getElementById('snap-floating-tooltip')?.remove();
+        closeBtn?.addEventListener('click', () => { cleanup(); this.hide(); });
+        modalEl?.addEventListener('click', e => { if (e.target === modalEl) { cleanup(); this.hide(); } });
     }
 }
 
