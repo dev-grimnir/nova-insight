@@ -15,7 +15,7 @@ class NovaSnapshotChart {
 
     static #MS_PER_DAY = 86400000;
     static #MONTH_THRESHOLD_DAYS = 60;
-    static #HOUR_THRESHOLD_DAYS  = 0.05;
+    static #HOUR_THRESHOLD_DAYS  = 0.05;   // ~72 min — anything at or below shows minute ticks
 
     /* ============================================================
      *  GRANULARITY + TICKS
@@ -73,13 +73,14 @@ class NovaSnapshotChart {
     }
 
     static #minuteTickValues(startMs, endMs) {
-        const INTERVAL = 10 * 60 * 1000;
+        const INTERVAL = 10 * 60 * 1000; // 10 minutes
         const ticks = [];
         const cursor = new Date(Math.ceil(startMs / INTERVAL) * INTERVAL);
         while (cursor.getTime() <= endMs) {
             ticks.push(cursor.getTime());
             cursor.setTime(cursor.getTime() + INTERVAL);
         }
+        // Always label the right edge so the chart end isn't unlabelled
         if (ticks.length === 0 || ticks[ticks.length - 1] < endMs) {
             ticks.push(endMs);
         }
@@ -104,6 +105,10 @@ class NovaSnapshotChart {
      *  PERIOD BUILDING
      * ============================================================ */
 
+    /**
+     * Group consecutive same-state events into periods. Each period
+     * carries its start/end timestamps and connected flag.
+     */
     static #buildPeriods(sortedEvents, endTime) {
         const periods = [];
         if (sortedEvents.length === 0) return periods;
@@ -129,6 +134,16 @@ class NovaSnapshotChart {
         return periods;
     }
 
+    /**
+     * Collapse periods that are below the visible pixel threshold into
+     * aggregated runs. At 1200px wide across 11 months, each pixel covers
+     * ~6.6 hours — anything shorter is invisible anyway. Aggregation
+     * preserves visual accuracy while keeping render volume manageable.
+     *
+     * Strategy: scan periods in order. If the current period is shorter
+     * than minMs, merge it with adjacent short periods into a single
+     * aggregate whose state is determined by total duration of each side.
+     */
     static #aggregatePeriods(periods, minMs) {
         if (periods.length === 0) return periods;
 
@@ -144,6 +159,7 @@ class NovaSnapshotChart {
                 continue;
             }
 
+            // Walk forward absorbing periods until we have a chunk >= minMs
             let chunkStart = p.startMs;
             let chunkEnd = p.endMs;
             let connectedMs = p.isConnected ? dur : 0;
@@ -172,6 +188,12 @@ class NovaSnapshotChart {
      *  PUBLIC BUILD
      * ============================================================ */
 
+    /**
+     * @param {HTMLCanvasElement} canvas
+     * @param {NovaSnapshotModel} model
+     * @param {(startDate: Date, endDate: Date) => void} onRangeClick
+     * @returns {{ chart: Chart, periods: Array }}
+     */
     static build(canvas, model, onRangeClick) {
         const events = (model.getEvents ? model.getEvents() : model.events) || [];
         const sortedEvents = [...events].sort((a, b) =>
@@ -184,9 +206,14 @@ class NovaSnapshotChart {
         const rawPeriods = this.#buildPeriods(sortedEvents, endTime);
         const granularity = this.#getGranularity(startTime, endTime);
 
-        const canvasWidth = canvas.clientWidth || canvas.width || 1200;
+        // Estimate the canvas's visible pixel width. The canvas itself hasn't
+        // been sized by Chart.js yet (that happens during new Chart()), so read
+        // from the parent container which already has its layout width. Fall
+        // back to the canvas's own size, then a safe default.
+        const canvasWidth = canvas.parentElement?.clientWidth || canvas.clientWidth || 1200;
         const rangeMs = endTime - startTime;
         const msPerPixel = rangeMs / canvasWidth;
+        // Aggregate periods narrower than half a pixel — invisible anyway.
         const minVisibleMs = msPerPixel * 0.5;
         const periods = this.#aggregatePeriods(rawPeriods, minVisibleMs);
 
@@ -195,11 +222,19 @@ class NovaSnapshotChart {
                          : granularity === 'hour'   ? this.#hourTickValues(startTime, endTime)
                          :                            this.#minuteTickValues(startTime, endTime);
 
+        // ONE dataset. Each period is two points at the same y, separated
+        // from the next period by a NaN-y point. Chart.js treats NaN y as
+        // a discontinuity — it ends the current fill segment and starts a
+        // new one. This prevents the fill renderer from drawing transitional
+        // polygons that leak the wrong color across the origin axis when a
+        // period transitions from +1 to -1.
         const data = [];
         periods.forEach((p, idx) => {
             const y = p.isConnected ? 1 : -1;
             data.push({ x: p.startMs, y });
             data.push({ x: p.endMs,   y });
+            // Discontinuity between periods. The NaN point's x sits at the
+            // boundary so the next period picks up exactly where this one ends.
             if (idx < periods.length - 1) {
                 data.push({ x: p.endMs, y: NaN });
             }
@@ -219,8 +254,8 @@ class NovaSnapshotChart {
                     spanGaps: false,
                     fill: {
                         target: 'origin',
-                        above: '#10b98188',
-                        below: '#ef444488'
+                        above: '#10b98188',  // green when y > 0
+                        below: '#ef444488'   // red when y < 0
                     }
                 }]
             },
@@ -257,7 +292,7 @@ class NovaSnapshotChart {
                         }
                     }
                 },
-                layout: { padding: { right: 40, left: 20, top: 30, bottom: 20 } }
+                layout: { padding: { right: 40, left: 20, top: 10, bottom: 20 } }
             }
         });
 
@@ -291,12 +326,16 @@ class NovaSnapshotChart {
             var area    = chart.chartArea;
             if (!area || mouseX < area.left || mouseX > area.right) { hide(); return; }
 
+            // Direct linear interpolation — avoids any Chart.js internal
+            // pixel/value translation artifacts.
             var xScale  = chart.scales.x;
             var pxLeft  = xScale.left;
             var pxRight = xScale.right;
             var t       = (mouseX - pxLeft) / (pxRight - pxLeft);
             var cursorMs = xScale.min + t * (xScale.max - xScale.min);
 
+            // Exclusive-end boundary so the cursor at a period transition
+            // resolves to the later (newer) period, not the outgoing one.
             var period = null;
             for (var i = 0; i < periods.length; i++) {
                 var isLast = (i === periods.length - 1);
@@ -356,15 +395,23 @@ class NovaSnapshotChart {
         canvas.addEventListener('mouseleave', hide);
     }
 
+    /**
+     * Position invisible clickable elements over each x-axis tick label.
+     * Each tick is its own DOM target — no pixel math at click time, real
+     * hover state on the actual label region. Re-runs on resize.
+     */
     static #mountTickClickTargets(canvas, chart, tickValues, granularity, startTime, endTime, onRangeClick) {
         if (!onRangeClick || granularity === 'minute') return;
 
         const parent = canvas.parentElement;
         if (!parent) return;
 
+        // Make the parent a positioning context so absolutely-positioned
+        // overlays sit relative to the canvas.
         const computedPos = getComputedStyle(parent).position;
         if (computedPos === 'static') parent.style.position = 'relative';
 
+        // Clear any prior overlays from a previous build (drill re-renders).
         parent.querySelectorAll('[data-tick-target]').forEach(el => el.remove());
 
         const xScale = chart.scales.x;
@@ -382,6 +429,8 @@ class NovaSnapshotChart {
             const px = xScale.getPixelForValue(tickMs);
             if (px == null || isNaN(px)) return;
 
+            // Determine the click target's horizontal extent — half-distance
+            // to neighboring ticks. Edge ticks extend out to the chart edge.
             const prevMs = idx > 0 ? tickValues[idx - 1] : startTime;
             const nextMs = idx < tickValues.length - 1 ? tickValues[idx + 1] : endTime;
             const prevPx = xScale.getPixelForValue(prevMs);
@@ -420,6 +469,7 @@ class NovaSnapshotChart {
                     const upperMs = Math.min(endTime, Date.now());
                     if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
                 } else {
+                    // hour granularity → drill to that specific hour
                     drillStart = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), clicked.getHours(), 0, 0, 0);
                     drillEnd   = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), clicked.getHours(), 59, 59, 999);
                     if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
