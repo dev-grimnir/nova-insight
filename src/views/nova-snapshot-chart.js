@@ -292,7 +292,7 @@ class NovaSnapshotChart {
                         }
                     }
                 },
-                layout: { padding: { right: 40, left: 20, top: 30, bottom: 20 } }
+                layout: { padding: { right: 40, left: 20, top: 10, bottom: 20 } }
             }
         });
 
