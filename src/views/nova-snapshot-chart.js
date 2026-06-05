@@ -15,6 +15,7 @@ class NovaSnapshotChart {
 
     static #MS_PER_DAY = 86400000;
     static #MONTH_THRESHOLD_DAYS = 60;
+    static #HOUR_THRESHOLD_DAYS  = 0.05;
 
     /* ============================================================
      *  GRANULARITY + TICKS
@@ -24,7 +25,8 @@ class NovaSnapshotChart {
         const days = (endMs - startMs) / this.#MS_PER_DAY;
         if (days >= this.#MONTH_THRESHOLD_DAYS) return 'month';
         if (days > 1.01) return 'day';
-        return 'hour';
+        if (days > this.#HOUR_THRESHOLD_DAYS) return 'hour';
+        return 'minute';
     }
 
     static #monthTickValues(startMs, endMs) {
@@ -70,6 +72,20 @@ class NovaSnapshotChart {
         return ticks;
     }
 
+    static #minuteTickValues(startMs, endMs) {
+        const INTERVAL = 10 * 60 * 1000;
+        const ticks = [];
+        const cursor = new Date(Math.ceil(startMs / INTERVAL) * INTERVAL);
+        while (cursor.getTime() <= endMs) {
+            ticks.push(cursor.getTime());
+            cursor.setTime(cursor.getTime() + INTERVAL);
+        }
+        if (ticks.length === 0 || ticks[ticks.length - 1] < endMs) {
+            ticks.push(endMs);
+        }
+        return ticks;
+    }
+
     static #formatTick(ms, granularity) {
         const d = new Date(ms);
         if (granularity === 'month') {
@@ -78,17 +94,16 @@ class NovaSnapshotChart {
         if (granularity === 'day') {
             return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         }
-        return `${d.getHours().toString().padStart(2, '0')}:00`;
+        if (granularity === 'hour') {
+            return `${d.getHours().toString().padStart(2, '0')}:00`;
+        }
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     }
 
     /* ============================================================
      *  PERIOD BUILDING
      * ============================================================ */
 
-    /**
-     * Group consecutive same-state events into periods. Each period
-     * carries its start/end timestamps and connected flag.
-     */
     static #buildPeriods(sortedEvents, endTime) {
         const periods = [];
         if (sortedEvents.length === 0) return periods;
@@ -114,16 +129,6 @@ class NovaSnapshotChart {
         return periods;
     }
 
-    /**
-     * Collapse periods that are below the visible pixel threshold into
-     * aggregated runs. At 1200px wide across 11 months, each pixel covers
-     * ~6.6 hours — anything shorter is invisible anyway. Aggregation
-     * preserves visual accuracy while keeping render volume manageable.
-     *
-     * Strategy: scan periods in order. If the current period is shorter
-     * than minMs, merge it with adjacent short periods into a single
-     * aggregate whose state is determined by total duration of each side.
-     */
     static #aggregatePeriods(periods, minMs) {
         if (periods.length === 0) return periods;
 
@@ -139,7 +144,6 @@ class NovaSnapshotChart {
                 continue;
             }
 
-            // Walk forward absorbing periods until we have a chunk >= minMs
             let chunkStart = p.startMs;
             let chunkEnd = p.endMs;
             let connectedMs = p.isConnected ? dur : 0;
@@ -168,12 +172,6 @@ class NovaSnapshotChart {
      *  PUBLIC BUILD
      * ============================================================ */
 
-    /**
-     * @param {HTMLCanvasElement} canvas
-     * @param {NovaSnapshotModel} model
-     * @param {(startDate: Date, endDate: Date) => void} onRangeClick
-     * @returns {{ chart: Chart, periods: Array }}
-     */
     static build(canvas, model, onRangeClick) {
         const events = (model.getEvents ? model.getEvents() : model.events) || [];
         const sortedEvents = [...events].sort((a, b) =>
@@ -186,32 +184,22 @@ class NovaSnapshotChart {
         const rawPeriods = this.#buildPeriods(sortedEvents, endTime);
         const granularity = this.#getGranularity(startTime, endTime);
 
-        // Estimate the canvas's visible pixel width. We don't have it before
-        // the chart mounts, so use the canvas's CSS size or fall back to 1200.
         const canvasWidth = canvas.clientWidth || canvas.width || 1200;
         const rangeMs = endTime - startTime;
         const msPerPixel = rangeMs / canvasWidth;
-        // Aggregate periods narrower than half a pixel — invisible anyway.
         const minVisibleMs = msPerPixel * 0.5;
         const periods = this.#aggregatePeriods(rawPeriods, minVisibleMs);
 
-        const tickValues = granularity === 'month' ? this.#monthTickValues(startTime, endTime)
-                         : granularity === 'day'   ? this.#dayTickValues(startTime, endTime)
-                         :                            this.#hourTickValues(startTime, endTime);
+        const tickValues = granularity === 'month'  ? this.#monthTickValues(startTime, endTime)
+                         : granularity === 'day'    ? this.#dayTickValues(startTime, endTime)
+                         : granularity === 'hour'   ? this.#hourTickValues(startTime, endTime)
+                         :                            this.#minuteTickValues(startTime, endTime);
 
-        // ONE dataset. Each period is two points at the same y, separated
-        // from the next period by a NaN-y point. Chart.js treats NaN y as
-        // a discontinuity — it ends the current fill segment and starts a
-        // new one. This prevents the fill renderer from drawing transitional
-        // polygons that leak the wrong color across the origin axis when a
-        // period transitions from +1 to -1.
         const data = [];
         periods.forEach((p, idx) => {
             const y = p.isConnected ? 1 : -1;
             data.push({ x: p.startMs, y });
             data.push({ x: p.endMs,   y });
-            // Discontinuity between periods. The NaN point's x sits at the
-            // boundary so the next period picks up exactly where this one ends.
             if (idx < periods.length - 1) {
                 data.push({ x: p.endMs, y: NaN });
             }
@@ -231,8 +219,8 @@ class NovaSnapshotChart {
                     spanGaps: false,
                     fill: {
                         target: 'origin',
-                        above: '#10b98188',  // green when y > 0
-                        below: '#ef444488'   // red when y < 0
+                        above: '#10b98188',
+                        below: '#ef444488'
                     }
                 }]
             },
@@ -242,50 +230,7 @@ class NovaSnapshotChart {
                 plugins: {
                     legend: { display: false },
                     decimation: { enabled: false },
-                    tooltip: {
-                        enabled: true,
-                        intersect: false,
-                        mode: 'index',
-                        callbacks: {
-                            title: (items) => {
-                                if (!items.length) return '';
-                                return new Date(items[0].parsed.x).toLocaleString([], {
-                                    month: 'short', day: 'numeric',
-                                    hour: 'numeric', minute: '2-digit'
-                                });
-                            },
-                            label: (ctx) => {
-                                if (ctx.parsed.y === 0) return "";
-
-                                const currentX = ctx.parsed.x;
-                                const period = periods.find(p => currentX >= p.startMs && currentX <= p.endMs);
-                                if (!period) return '';
-
-                                const fmt = (ms) => new Date(ms).toLocaleString([], {
-                                    month: 'short', day: 'numeric',
-                                    hour: 'numeric', minute: '2-digit'
-                                });
-
-                                const durMs  = period.endMs - period.startMs;
-                                const hours  = Math.floor(durMs / 3600000);
-                                const mins   = Math.floor((durMs % 3600000) / 60000);
-                                const durStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-
-                                const label = period.isConnected ? 'Connected' : 'Disconnected';
-                                return `${label} — ${fmt(period.startMs)} to ${fmt(period.endMs)} (${durStr})`;
-                            },
-                            labelColor: (ctx) => {
-                                if (ctx.parsed.y === 0) return null;
-                                const period = periods.find(p => ctx.parsed.x >= p.startMs && ctx.parsed.x <= p.endMs);
-                                if (!period) return null;
-                                const color = period.isConnected ? '#10b981' : '#ef4444';
-                                return {
-                                    borderColor: color,
-                                    backgroundColor: color
-                                };
-                            },
-                        }
-                    }
+                    tooltip: { enabled: false }
                 },
                 scales: {
                     x: {
@@ -321,26 +266,105 @@ class NovaSnapshotChart {
             this.#mountTickClickTargets(canvas, chart, tickValues, granularity, startTime, endTime, onRangeClick);
         }, 100);
 
+        this.#mountCustomTooltip(canvas, chart, periods);
+
         return { chart, periods };
     }
 
-    /**
-     * Position invisible clickable elements over each x-axis tick label.
-     * Each tick is its own DOM target — no pixel math at click time, real
-     * hover state on the actual label region. Re-runs on resize.
-     */
+    static #mountCustomTooltip(canvas, chart, periods) {
+        const TIP_ID = 'snap-chart-tooltip';
+
+        const fmt = function(ms) {
+            return new Date(ms).toLocaleString([], {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            });
+        };
+
+        const hide = function() {
+            var el = document.getElementById(TIP_ID);
+            if (el) el.remove();
+        };
+
+        canvas.addEventListener('mousemove', function(e) {
+            var rect    = canvas.getBoundingClientRect();
+            var mouseX  = e.clientX - rect.left;
+            var area    = chart.chartArea;
+            if (!area || mouseX < area.left || mouseX > area.right) { hide(); return; }
+
+            var xScale  = chart.scales.x;
+            var pxLeft  = xScale.left;
+            var pxRight = xScale.right;
+            var t       = (mouseX - pxLeft) / (pxRight - pxLeft);
+            var cursorMs = xScale.min + t * (xScale.max - xScale.min);
+
+            var period = null;
+            for (var i = 0; i < periods.length; i++) {
+                var isLast = (i === periods.length - 1);
+                if (cursorMs >= periods[i].startMs && (isLast ? cursorMs <= periods[i].endMs : cursorMs < periods[i].endMs)) {
+                    period = periods[i]; break;
+                }
+            }
+            if (!period) { hide(); return; }
+
+            var durMs  = period.endMs - period.startMs;
+            var hours  = Math.floor(durMs / 3600000);
+            var mins   = Math.floor((durMs % 3600000) / 60000);
+            var durStr = hours > 0 ? (hours + 'h ' + mins + 'm') : (mins + 'm');
+            var label  = period.isConnected ? 'Connected' : 'Disconnected';
+            var color  = period.isConnected ? '#10b981' : '#ef4444';
+            var title  = new Date(cursorMs).toLocaleString([], {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            });
+
+            var tip = document.getElementById(TIP_ID);
+            if (!tip) {
+                tip = document.createElement('div');
+                tip.id = TIP_ID;
+                tip.style.position      = 'fixed';
+                tip.style.zIndex        = '10200';
+                tip.style.pointerEvents = 'none';
+                tip.style.background    = '#27272a';
+                tip.style.border        = '1px solid #3f3f46';
+                tip.style.borderRadius  = '0.5rem';
+                tip.style.padding       = '0.5rem 0.75rem';
+                tip.style.fontSize      = '0.8rem';
+                tip.style.color         = '#e5e7eb';
+                tip.style.boxShadow     = '0 4px 16px rgba(0,0,0,0.5)';
+                tip.style.whiteSpace    = 'nowrap';
+                document.body.appendChild(tip);
+            }
+
+            tip.innerHTML =
+                '<div style="font-weight:600;margin-bottom:3px;">' + title + '</div>' +
+                '<div style="display:flex;align-items:center;gap:6px;">' +
+                    '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;' +
+                        'background:' + color + ';border:1px solid ' + color + ';flex-shrink:0;"></span>' +
+                    '<span>' + label + ' &mdash; ' + fmt(period.startMs) + ' to ' + fmt(period.endMs) + ' (' + durStr + ')</span>' +
+                '</div>';
+
+            var pad = 12;
+            var tw  = tip.offsetWidth;
+            var th  = tip.offsetHeight;
+            var tx  = e.clientX + pad;
+            var ty  = e.clientY - th - pad;
+            if (tx + tw > window.innerWidth - 8) tx = e.clientX - tw - pad;
+            if (ty < 8) ty = e.clientY + pad;
+            tip.style.left = tx + 'px';
+            tip.style.top  = ty + 'px';
+        });
+
+        canvas.addEventListener('mouseleave', hide);
+    }
+
     static #mountTickClickTargets(canvas, chart, tickValues, granularity, startTime, endTime, onRangeClick) {
-        if (!onRangeClick || granularity === 'hour') return;
+        if (!onRangeClick || granularity === 'minute') return;
 
         const parent = canvas.parentElement;
         if (!parent) return;
 
-        // Make the parent a positioning context so absolutely-positioned
-        // overlays sit relative to the canvas.
         const computedPos = getComputedStyle(parent).position;
         if (computedPos === 'static') parent.style.position = 'relative';
 
-        // Clear any prior overlays from a previous build (drill re-renders).
         parent.querySelectorAll('[data-tick-target]').forEach(el => el.remove());
 
         const xScale = chart.scales.x;
@@ -358,8 +382,6 @@ class NovaSnapshotChart {
             const px = xScale.getPixelForValue(tickMs);
             if (px == null || isNaN(px)) return;
 
-            // Determine the click target's horizontal extent — half-distance
-            // to neighboring ticks. Edge ticks extend out to the chart edge.
             const prevMs = idx > 0 ? tickValues[idx - 1] : startTime;
             const nextMs = idx < tickValues.length - 1 ? tickValues[idx + 1] : endTime;
             const prevPx = xScale.getPixelForValue(prevMs);
@@ -391,9 +413,15 @@ class NovaSnapshotChart {
                     drillEnd   = new Date(drillEnd.getTime() - 1);
                     if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
                     if (drillEnd.getTime()   > endTime)   drillEnd   = new Date(endTime);
-                } else {
+                } else if (granularity === 'day') {
                     drillStart = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), 0, 0, 0, 0);
                     drillEnd   = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), 23, 59, 59, 999);
+                    if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
+                    const upperMs = Math.min(endTime, Date.now());
+                    if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
+                } else {
+                    drillStart = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), clicked.getHours(), 0, 0, 0);
+                    drillEnd   = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate(), clicked.getHours(), 59, 59, 999);
                     if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
                     const upperMs = Math.min(endTime, Date.now());
                     if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
