@@ -7,10 +7,13 @@ class NovaNotifierController {
      * @param {string} tabLabel
      */
     static async alert(status, nodeName, tabLabel, sinceTimestamp = null) {
-        const admins = await this.#readAdmins();
-        if (!admins.length) return;
-
         const message = this.#buildMessage(status, nodeName, tabLabel, sinceTimestamp);
+        const admins = await this.#readAdmins();
+
+        if (!admins.length) {
+            await this.#dispatch(null, message);
+            return;
+        }
 
         for (const admin of admins) {
             try {
@@ -51,6 +54,7 @@ class NovaNotifierController {
      * so the signature stays stable when the real transport goes in.
      */
     static async #dispatch(phoneNumber, message) {
-        window.alert(`[Notifier → ${phoneNumber}]\n${message}`);
+        const target = phoneNumber ? `Notifier → ${phoneNumber}` : 'Notifier';
+        window.alert(`[${target}]\n${message}`);
     }
 }
