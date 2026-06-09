@@ -173,6 +173,11 @@ class NovaTabController {
         const tab = this.tabs.find(t => t.label === label);
         if (!tab) return;
         tab.isNetworkTab = !tab.isNetworkTab;
+        if (tab.isNetworkTab) {
+            for (const ctrl of tab.customers) {
+                ctrl.model.lastAlertSent = null;
+            }
+        }
         await this.save();
     }
     
@@ -225,7 +230,7 @@ class NovaTabController {
             && !isNaN(customer.lastEventTime.getTime())) {
             customer.markDisconnected(customer.lastEventTime.getTime());
         }
-        
+
         const newStatus = customer.status;
         const now = Date.now();
         const nodeName = customer.friendlyName || customer.radiusUsername;

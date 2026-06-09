@@ -7,10 +7,13 @@ class NovaNotifierController {
      * @param {string} tabLabel
      */
     static async alert(status, nodeName, tabLabel, sinceTimestamp = null) {
-        const admins = await this.#readAdmins();
-        if (!admins.length) return;
-
         const message = this.#buildMessage(status, nodeName, tabLabel, sinceTimestamp);
+        const admins = await this.#readAdmins();
+
+        if (!admins.length) {
+            await this.#dispatch(null, message);
+            return;
+        }
 
         for (const admin of admins) {
             try {
@@ -51,6 +54,32 @@ class NovaNotifierController {
      * so the signature stays stable when the real transport goes in.
      */
     static async #dispatch(phoneNumber, message) {
-        window.alert(`[Notifier → ${phoneNumber}]\n${message}`);
+        NovaToast.error(message, { duration: 10000 });
+        const klaxon = this.#startKlaxon();
+        window.alert(message);
+        klaxon.stop();
+    }
+
+    static #startKlaxon() {
+        const ctx = new AudioContext();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.4;
+        gain.connect(ctx.destination);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.connect(gain);
+
+        // Pre-schedule alternating tones for up to 10 minutes on the audio
+        // timeline. Web Audio runs off the JS thread, so this keeps cycling
+        // even while window.alert() has the main thread blocked.
+        const interval = 0.4;
+        const freqs = [880, 660];
+        for (let i = 0; i < (600 / interval); i++) {
+            osc.frequency.setValueAtTime(freqs[i % 2], ctx.currentTime + i * interval);
+        }
+
+        osc.start();
+        return { stop: () => { osc.stop(); ctx.close(); } };
     }
 }
