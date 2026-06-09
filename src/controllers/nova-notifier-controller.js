@@ -10,14 +10,16 @@ class NovaNotifierController {
         const message = this.#buildMessage(status, nodeName, tabLabel, sinceTimestamp);
         const admins = await this.#readAdmins();
 
+        const silent = status === 'Connected';
+
         if (!admins.length) {
-            await this.#dispatch(null, message);
+            await this.#dispatch(null, message, silent);
             return;
         }
 
         for (const admin of admins) {
             try {
-                await this.#dispatch(admin.phoneNumber, message);
+                await this.#dispatch(admin.phoneNumber, message, silent);
             } catch (err) {
                 console.error(`[NovaNotifierController.alert] failed for ${admin.name}:`, err);
             }
@@ -53,11 +55,15 @@ class NovaNotifierController {
      * Phone number is in the signature even though the stub ignores it,
      * so the signature stays stable when the real transport goes in.
      */
-    static async #dispatch(phoneNumber, message) {
+    static async #dispatch(phoneNumber, message, silent = false) {
         NovaToast.error(message, { duration: 10000 });
-        const klaxon = this.#startKlaxon();
-        window.alert(message);
-        klaxon.stop();
+        if (silent) {
+            window.alert(message);
+        } else {
+            const klaxon = this.#startKlaxon();
+            window.alert(message);
+            klaxon.stop();
+        }
     }
 
     static #startKlaxon() {
