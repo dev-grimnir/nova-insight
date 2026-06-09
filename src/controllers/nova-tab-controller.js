@@ -173,6 +173,11 @@ class NovaTabController {
         const tab = this.tabs.find(t => t.label === label);
         if (!tab) return;
         tab.isNetworkTab = !tab.isNetworkTab;
+        if (tab.isNetworkTab) {
+            for (const ctrl of tab.customers) {
+                ctrl.model.lastAlertSent = null;
+            }
+        }
         await this.save();
     }
     
