@@ -66,7 +66,11 @@ class NovaCustomerController {
     }
 
     async toggleAlertsSuppressed() {
+        const wasSupPressed = this.model.alertsSuppressed;
         this.model.toggleAlertsSuppressed();
+        if (wasSupPressed) {
+            this.model.lastAlertSent = null;
+        }
         await this.dashboardController.getTabController().save();
         this.view.update();
     }

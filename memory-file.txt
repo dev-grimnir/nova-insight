@@ -2,145 +2,111 @@
 
 ## Project state
 - Repo: github.com/dev-grimnir/nova-insight
-- Branches: dev (working), main (stable), demo (live demo, branched off main)
-- Workflow: branch dev → fix one discrete problem → merge to main → delete dev → re-branch
+- Branches: dev (working), main (stable), demo (live demo / GitHub Pages)
+- Workflow: fix on dev → merge to main → merge main to demo → delete dev. One discrete problem per dev cycle. Do NOT keep dev alive between cycles.
+- Merge flow is always dev → main → demo, in that order. Push source files directly to demo via MCP push_files. NEVER use GitHub's conflict resolver (it commits to the PR's base branch, not the target).
 - Demo Pages URL: https://dev-grimnir.github.io/nova-insight/
 - File URL pattern: https://raw.githubusercontent.com/dev-grimnir/nova-insight/refs/heads/{branch}/{path}
+- Tampermonkey @require URLs must point to the demo branch: https://raw.githubusercontent.com/dev-grimnir/nova-insight/demo/src/...
 
 ## Demo phase status
 - Phase 1 (deploy pipeline): DONE
 - Phase 2 (synthetic data, encrypted localStorage round-trip, seeder): DONE
 - Phase 3 (about-as-background, account list box): DONE; tooltips and fake phone DEFERRED. Phase 3 functionally closed.
 
-## Recent work (this session)
+## Project rename status
+- DONE. Display name: "Nova Insight". Repo: nova-insight. Class prefix: Nova. CSS prefix: .nova- (or inline styles).
 
-### 24-hour snapshot click target on inline dashboard snapshot
-**Files:** `src/views/nova-customer-view.js`, `src/controllers/nova-customer-controller.js`
+## Recent work
 
-The inline snapshot bar in each customer row is now clickable; opens a 24-hour snapshot for that customer. Mirrors the existing status-pill → `open3DaySnapshot` pattern.
+### Chart aggregation threshold bug (canvas width measured before Chart.js mounts)
+**File:** `src/views/nova-snapshot-chart.js`
 
-Customer view: snapshot host div gets `cursor: pointer` and tooltip; click handler branch added in `#attachListeners` checking `.snapshot-host` via `closest()` so clicks anywhere on the SVG bubble up.
+`canvas.clientWidth` returns 300 (HTML default) before Chart.js sizes the canvas. This made `minVisibleMs` ~4x too large on wide containers, silently aggregating events shorter than ~72 minutes on month-scale views.
 
-Customer controller: new `open24HourSnapshot()` sibling of `open3DaySnapshot()`. Uses strict `now - 24h` start (no midnight snap) so the snapshot window matches the inline bar's visible window exactly.
+**Fix:** Use `canvas.parentElement?.clientWidth` instead — the parent container already has its CSS layout width before Chart.js runs.
 
-### Snapshot drill-down past-day end-time clamp fix
-**File:** `src/views/nova-snapshot-chart.js`, `#mountTickClickTargets`
+    const canvasWidth = canvas.parentElement?.clientWidth || canvas.clientWidth || 1200;
 
-**Bug:** Clicking a day-tick on a snapshot drill-down hard-coded `drillEnd` to 23:59:59.999 of the clicked day. For *today*, that meant the analyzer credited the trailing gap from the last real event all the way to end-of-day in the last known status — inflating current-day uptime/downtime by however many hours remained.
+### Chart height + padding reduction (eliminated modal scrollbar)
+**Files:** `src/views/nova-snapshot-panel-view.js`, `src/views/nova-snapshot-chart.js`
 
-**Fix:** Mirror the month-branch's clamp pattern on the day-branch. Append after the existing `drillStart`/`drillEnd` assignments in the `else` branch:
+Dead space above the chart data came from `layout.padding.top: 30` (no top-axis labels, so pure wasted air) combined with `CHART_HEIGHT_PX = 320`. Reduced to `top: 10` and `260px` respectively. Eliminated the scrollbar in the snapshot modal.
 
-    if (drillStart.getTime() < startTime) drillStart = new Date(startTime);
-    const upperMs = Math.min(endTime, Date.now());
-    if (drillEnd.getTime() > upperMs) drillEnd = new Date(upperMs);
+### Tooltip coordinate mismatch fix (scale-95 on modal box)
+**File:** `src/views/nova-snapshot-view.js`
 
-`Math.min(endTime, Date.now())` is defensive — `Date.now()` is universal upper bound, `endTime` keeps drill inside the snapshot. Past-day drills unaffected. Top-level snapshot was already fine (defaults `endDate` to `now`).
+Root cause: modal inner box had Tailwind `scale-95` class permanently applied — never removed, so the canvas was always visually at 95% while Chart.js used 100% coordinates. ~5% rightward offset (~3 min on a 59-min chart).
 
-### Snapshot view refactor (3-commit set, single dev cycle)
+**Fix:** Removed Tailwind scale class. Inner box now uses `style="transform:scale(0.95)"` and animates to `scale(1)` via double `requestAnimationFrame`. Added `id="snapshot-modal-box"` for JS targeting.
 
-Three structural changes shipped together. Visible duplication between the modal snapshot view and the report snapshot view was ~80% — same header structure, same drill wiring, same chart-lifecycle dance. The shared paradigm extracted into a new panel class; the two outer views shrank to chrome + composition.
+**Rule:** NEVER use a Tailwind scale class on the modal box. The animation must be inline style only.
 
-#### Commit 1: Slice-not-fetch architecture
-**File:** `src/controllers/nova-snapshot-controller.js`
+### Tooltip period lookup fix
+**File:** `src/views/nova-snapshot-chart.js`, `#mountCustomTooltip`
 
-Drill-downs no longer make HTTP calls. Initial load still does (via `buildData`), but `drillTo` now operates on the parent model's already-fetched events array.
+Replaced `chart.scales.x.getValueForPixel()` with direct linear interpolation to avoid Chart.js internal translation artifacts. Added exclusive-end boundary so the cursor at a period transition resolves to the later period, not the outgoing one.
 
-New static `buildFromEvents(username, friendlyName, events, startDate, endDate)` — analyze-only path. Filters events to `[startDate, endDate]` (critical — see below), runs `NovaAnalyzer.computeMetrics`, returns a fresh `NovaSnapshotModel`.
+    var t = (mouseX - pxLeft) / (pxRight - pxLeft);
+    var cursorMs = xScale.min + t * (xScale.max - xScale.min);
 
-`drillTo` updated:
+### Syntax error fix in nova-snapshot-chart.js
+**File:** `src/views/nova-snapshot-chart.js`
 
-    async drillTo(startDate, endDate) {
-        const parent = this.historyStack[this.historyStack.length - 1];
-        if (!parent) return null;
-        const model = NovaSnapshotController.buildFromEvents(
-            this.username, this.friendlyName, parent.events, startDate, endDate
-        );
-        if (!model) return null;
-        this.historyStack.push(model);
-        return model;
-    }
+Extra closing brace in the `plugins` block pushed `scales` and `layout` outside `options`, causing `SyntaxError: missing ) after argument list` at line ~4746 of the Tampermonkey bundle. Fixed by collapsing to a single `},` that correctly closes only `plugins`.
 
-Kept `async` keyword despite no awaits — preserves existing `await drillTo(...)` call sites unchanged.
+### Uptime color-coding in snapshot ribbon
+**File:** `src/views/nova-snapshot-panel-view.js`, `#buildRibbon`
 
-`buildData` got the same defensive filter applied (the snapshot controller now consistently filters events to `[startDate, endDate]` before handing to analyzer, regardless of whether events came from HTTP or from a parent model).
+    const uptime = parseFloat(this.model.getUptimePercent());
+    const uptimeColor = uptime >= 75 ? 'text-emerald-400' : uptime >= 60 ? 'text-yellow-400' : 'text-red-400';
 
-#### Commit 2: Panel extraction
-**Files:** `src/views/nova-snapshot-panel-view.js` (new), `src/views/nova-snapshot-view.js` (full rewrite), `src/views/nova-report-snapshot-view.js` (full rewrite)
+### demo index.html missing script tag
+**File:** `index.html` on demo branch
 
-New `NovaSnapshotPanelView` owns the shared paradigm: header HTML (subtitle / daterange / uptime / Back button) + canvas + `#updateHeader` + `#initChart` + `#onRangeClick` + `#onBack` + chart instance. Mounted into whatever container its wrapper provides.
+`NovaSnapshotPanelView` was not loaded — `nova-snapshot-panel-view.js` script tag was missing. Added between `nova-snapshot-chart.js` and `nova-snapshot-view.js`.
 
-Constructor: `(controller, model, containerEl)`. Static `CHART_HEIGHT_PX = 320`. Selectors are class-scoped (`.snap-panel-subtitle`, `.snap-panel-daterange`, `.snap-panel-uptime`, `.snap-panel-back-btn`, `.snap-panel-body`, `.snap-panel-canvas`) and queried within `this.container` — no global ID collisions if multiple panels coexist.
+**Rule:** demo's `index.html` manually lists every `<script>` tag in load order (same order as Tampermonkey @require directives). Any new view/model/controller file added to the project MUST also be added to index.html on the demo branch.
 
-`NovaSnapshotView` slimmed to modal chrome + panel composition. Modal header row now just holds the Close button on the right; subtitle/daterange/uptime moved into the panel. `hide()` calls `super.hide()` only.
+## Architectural decisions
 
-`NovaReportSnapshotView` slimmed to receive parent container + instantiate panel. No `destroy()`.
+- **`NovaSnapshotPanelView`** is the shared snapshot paradigm (header ribbon + canvas + drill-down wiring). Composed into `NovaSnapshotView` (modal wrapper) and `NovaReportSnapshotView` (inline). Views are dumb — no data fetching.
+- **`NovaSnapshotController`** owns the history stack. `drillTo` is a pure transform (no HTTP) — operates on parent model's already-fetched events. `buildFromEvents` and `buildData` both filter events to `[startDate, endDate]` before the analyzer call.
+- **No destroy methods** anywhere in the snapshot system. Chart instances die with their DOM; GC handles it.
+- **`NovaAnalyzer.#computeLeadTime`** injects an opposite-status boundary event at `requestedStart` when the first real event is after the window start. This is data, not presentation — parent models store events including the boundary; drill-downs inherit that and get their own sub-window boundary.
+- **`NovaSnapshotChart` period-building is internal.** `#buildPeriods` and `#aggregatePeriods` stay private.
+- **`canvas.clientWidth` is unreliable before Chart.js mounts.** Always use `canvas.parentElement?.clientWidth` for any pre-mount width measurement.
 
-#### Commit 3: Destroy method removal
-**Files:** `src/views/nova-snapshot-view.js`, `src/views/nova-report-snapshot-view.js`, `src/views/nova-report-view.js`
-
-All `destroy()` methods removed. Chart instances die with their containing DOM; JS handles GC. `NovaReportView.hide()` now just nulls `this.inlineSnapshotView` and calls `super.hide()`.
-
-### Snapshot drill-down 100% uptime fix (the bug that surfaced the slice-not-fetch architecture's need for window filtering)
-
-After Commit 1 first deployed, every day-drilldown reported 100% uptime regardless of actual data. Root cause: `buildFromEvents` was handing the analyzer the entire parent event stream, but telling it `requestedStart`/`requestedEnd` = the narrow drill window. `#processAllEntries` accumulated `sessionSeconds` across the parent's full multi-day range; `#computeUptimeMetrics` divided by the narrow window's seconds; numerator > denominator; `Math.min(100, ratio)` clamped to 100.
-
-Fix: filter `events` to `[startDate, endDate]` inside `buildFromEvents` before the analyzer call. The analyzer's `#computeLeadTime` injects its own boundary at `requestedStart`, so leading-state correctness doesn't require pre-window context.
-
-### Dashboard 24-hour click 100% uptime fix
-Same shape of bug, different source of extra events. The inline snapshot click via `open24HourSnapshot` reported 100% because `NovaHTTPController.paginateReportLogs`'s `#buildPaginationParams` silently overrides `shour`/`smin` to `00:00` when explicit args are null, widening the actual fetch from `[now-24h, now]` to `[start-of-day, now]`. The analyzer was then handed ~41 hours of events and told the window was 24.
-
-Fix: apply the same defensive `[startDate, endDate]` filter to `buildData` (mirrors `buildFromEvents`). `buildData` and `buildFromEvents` now symmetric — both filter events to the requested window before the analyzer call, regardless of where events came from.
-
-The HTTP controller's silent shour/smin override is the upstream cause and remains unfixed in this cycle (intentionally — flagged for memory carryover; see latent bugs below). The snapshot controller is now hardened against it.
-
-## Architectural decisions confirmed this session
-
-- **`NovaSnapshotChart.buildPeriods` stays internal.** Earlier in this session I argued for hoisting it to public static so the customer-view inline snapshot could share it. Grimnir scoped that out: `NovaInlineSnapshotView` works perfectly and is not being touched. The chart class continues to own period-building privately.
-- **Boundary injection in `NovaAnalyzer.#computeLeadTime` is data, not presentation.** The injected opposite-status event at `requestedStart` is a valid anchor representing the modem's state entering the window. Parent models store events including the boundary (via `getEntries`); drill-downs inherit that, then the analyzer injects another boundary appropriate to the sub-window. Both layers' boundaries are correct for their respective windows.
-- **No destroy methods anywhere in the snapshot system.** GC handles it.
-- **The two snapshot view classes intentionally keep the same names (`NovaSnapshotView`, `NovaReportSnapshotView`) post-refactor.** The new shared class is `NovaSnapshotPanelView`.
-
-## Latent bugs identified but not fixed this session
+## Latent bugs identified but not fixed
 
 ### `NovaHTTPController.#buildPaginationParams` silent time-of-day override
 **File:** `src/controllers/nova-http-controller.js`
 
-When `paginateReportLogs` is called with explicit `startDate`/`endDate` but null hour/min args, `#buildPaginationParams` silently forces `shour=0, smin=0` for the start and `ehour=23, emin=59` for non-today end dates. This overrides the time component of any explicit Date objects passed in. Callers that snap to midnight (the 3-day path) are unaffected; callers that don't (the 24-hour path) get a wider fetch window than requested.
+When `paginateReportLogs` is called with explicit `startDate`/`endDate` but null hour/min args, `#buildPaginationParams` silently forces `shour=0, smin=0` and `ehour=23, emin=59`. This widens the fetch window beyond what the caller requested. The snapshot controller is defended via window-filtering in `buildData` and `buildFromEvents`, but the bug remains for any other caller of `paginateReportLogs`.
 
-**Fix when ready:** `#buildPaginationParams` should read `sDate.getHours()` / `sDate.getMinutes()` when explicit args are null, falling back to 0/0 only when no `startDate` was passed at all (the "fetch current month" entry path). Same for `eDate` and 23/59.
-
-Snapshot controller is currently defended via window-filtering in `buildData`, but the bug remains for any other caller of `paginateReportLogs`. The `getLatestEntry` method in the same file calls it with `(username, startDate, now)` — verify whether the silent override matters for that caller before fixing.
-
-### Cleanup-able minor stuff in `NovaHTTPController`
-- `paginateReportLogs` has a dead `const last = entries[entries.length - 1]` at the bottom (assigned, never used).
-- `#parsePageRows` builds a `rows` variable that's never read.
+**Fix when ready:** Read `sDate.getHours()` / `sDate.getMinutes()` when explicit args are null; fall back to 0/0 only when no `startDate` was passed at all.
 
 ### Duplicate toast on Account Not Found
-**Sites:** `updateCustomerStatus` (dashboard controller) AND `tabController.add` (tab controller) both fire `'Customer not found in RADIUS'` toast on the same condition. `add()` checks `ctrl.model.status === 'Account Not Found'` after calling `updateCustomerStatus` and fires a second toast.
-
-Fix when ready: remove the toast from `tabController.add`, keep the customer-remove. `updateCustomerStatus` owns the messaging:
-
-    if (ctrl.model.status === 'Account Not Found') {
-        this.remove(trimmed);
-        return;
-    }
+`updateCustomerStatus` (dashboard controller) AND `tabController.add` both fire a 'Customer not found in RADIUS' toast on the same condition. Fix: remove the toast from `tabController.add`, keep the customer-remove. `updateCustomerStatus` owns the messaging.
 
 ### `getLatestEntry` backward-walk early-exit
-**File:** `demo/nova-http-controller-synthetic.js`, `getLatestEntry`.
+**File:** `demo/nova-http-controller-synthetic.js`
 
-Loop walks events array backward. `t > now` does `continue`, `t < cutoff` does `break`. If a stream has `[past_event, future_event]` and the lookback window is narrow, the loop skips the future event, then breaks on the past event because it's older than the narrow cutoff — returning undefined even though widening the lookback would find it. Practically masked by progressive-lookback widening but semantically wrong. Should `continue` instead of `break`.
+Loop walks events array backward. `t < cutoff` does `break` — should `continue`. Practically masked by progressive-lookback widening but semantically wrong.
 
-### Duplicate methods in `NovaAnalyzer`
-The memory file flagged duplicate `getEntries`/`computeMetrics` definitions; the current main version inspected this session shows only single definitions. May have been resolved already, or may be branch-state confusion. Worth confirming next time the file is opened.
+### Cleanup in `NovaHTTPController`
+- `paginateReportLogs` has a dead `const last = entries[entries.length - 1]` (assigned, never used).
+- `#parsePageRows` builds a `rows` variable that's never read.
 
 ### Other carry-over latent bugs (from prior sessions, still open)
-- Dashboard view hardcodes logo URL pointing at old repo name `nova-insight`. GitHub redirect for raw URLs is fragile.
+- Dashboard view hardcodes logo URL pointing at old repo name `neonova-post-processor`. GitHub redirect for raw URLs is fragile.
 - Status-pill HTTP fetches are redundant with buffer-update event fetches. Future cleanup: derive status purely from `customer.eventHistory` instead of refetching.
-- Style block existence check in `createElements` (`if (!document.getElementById('nova-scroll-style'))`) skips re-injection if old block exists — stale CSS can persist until hard reload. Replace contents instead of skipping.
-- Production header layout assumes host-page CSS resets.
+- Style block existence check in `createElements` skips re-injection if old block exists — stale CSS can persist until hard reload. Replace contents instead of skipping.
 
-## Planned: shared button class refactor (NOT STARTED, carried forward)
-`.nova-btn` + variants (`-primary`, `-cancel`) defined in central style block (NOT Tailwind utility chains in markup). Reasons: eliminates duplicate class strings (e.g., privacy button className in two places), correct rendering when host page lacks Tailwind, single point of edit.
+## Planned work (carried forward)
+
+### Shared button class refactor (NOT STARTED)
+`.nova-btn` + variants (`-primary`, `-cancel`) defined in central style block (NOT Tailwind utility chains in markup). Eliminates duplicate class strings, correct rendering when host page lacks Tailwind, single point of edit.
 
 Suggested sequence:
 1. Define `.nova-btn` base + `.nova-btn-primary` variant in central style block. Don't migrate yet. Merge.
@@ -148,54 +114,37 @@ Suggested sequence:
 3. Migrate one view at a time. Each its own dev cycle.
 4. Define `.nova-btn-cancel` once cancel buttons are inventoried. Migrate.
 
-Won't migrate cleanly: tab close x and tab add `+` (have own classes), drag handle (a span), icon-only buttons (need `.nova-btn-icon`), modal destructive buttons (need own variants).
+Won't migrate cleanly: tab close x and tab add + (have own classes), drag handle (a span), icon-only buttons (need `.nova-btn-icon`), modal destructive buttons (need own variants).
 
-## Planned project rename (NOT STARTED, carried forward)
-- Display: "Nova Insight" → "Nova:Insight"
-- Repo: `nova-insight` → `nova-insight`
-- Class prefix: `Nova` → `NovaInsight`
-- CSS prefix: `.nova-` → `.ni-`
-- Sequence: rename on dev → merge to main → merge main into demo → one demo follow-up commit (index.html script paths, demo/*.js, about copy) → rename GitHub repo last to avoid breaking raw URLs mid-flight
-- Logo replacement: SVG with text "Nova" (green #34d399) + ":Insight" (white). Optional swish above all letters with green→white gradient and star at apex.
-
-## Refresh button question (DEFERRED, carried forward)
-User questioned whether Refresh still serves a purpose now that polling is automatic. Conclusion: still useful when polling is paused, and for "I just did X, I want to see the result NOW." The "looks like it does nothing" complaint is real — fix would be spin-on-click feedback + brief flash/pulse on "Last Updated" timestamp. Possibly shrink to icon-only.
-
-## Demo registry / sanitizer fix (DONE earlier, carried forward)
-- Add-customer username sanitizer in src/controllers/nova-add-customer-controller.js strips everything outside [a-zA-Z0-9.] — by design.
-- 9 demo registry usernames had underscores or hyphens; rewritten to substitute periods.
-- Matching rename shipped in demo/nova-demo-seeder.js #SCENARIO. Both files MUST ship together.
-- Decision: do nothing about stale localStorage from returning visitors.
+### Refresh button feedback (DEFERRED)
+"Looks like it does nothing" complaint is real. Fix: spin-on-click feedback + brief flash/pulse on "Last Updated" timestamp. Possibly shrink to icon-only.
 
 ## Communication notes
 - Hardware mode = design/planning, no code
 - Software mode = code generation OK
 - DON'T flip into software mode without being told. Wait for the explicit signal even after a long hardware-mode planning thread.
-- User holds strong MVC opinions, calls out architectural violations sharply
+- User holds strong MVC opinions, calls out architectural violations sharply.
 - "Dev is where the work gets done; main is the stable baseline."
-- Branch dev → fix one discrete problem → merge to main → delete dev → re-branch. Don't bundle unrelated fixes. (Exception: when multiple changes are tightly coupled and being tested as a bundle, ship together.)
-- DO NOT pull `main.js` — production bootstrap is `scripts/nova-dashboard.user.js`
-- **Don't use `web_fetch` on the repo. The fetch tool returns stale or wrong files repeatedly. This session it returned versions of `nova-snapshot-controller.js` and `nova-snapshot-view.js` that were both missing methods the live code calls, leading to bad advice. ALWAYS ask the user to paste the file. This is non-negotiable.**
+- One discrete problem per dev cycle. Don't bundle unrelated fixes. (Exception: tightly coupled changes being tested as a bundle.)
+- DO NOT pull `main.js` — production bootstrap is `src/scripts/nova-dashboard.user.js`
+- **Don't use web_fetch on the repo.** It returns stale or wrong files. ALWAYS read files from the local filesystem. Non-negotiable.
 - When asked for "the methods" or edits to a class, prefer separate code blocks per method, not one big dump.
-- When asked to edit a class, **first show edits cleanly without iterating over the same block multiple times**. Each block in final form once.
-- **NEVER deliver a code edit with `// ... rest unchanged` or any placeholder comment that elides surrounding code.** When showing a method body, give the complete method body. User pastes verbatim; placeholder comments will break syntax.
-- When user is on dev/main/demo, REMEMBER which. Tailwind class availability differs:
-  - Demo: precompiled tailwind.css with explicit safelist. Classes not in safelist produce no CSS.
-  - Dev/main: runs as userscript on host page (admin.neonova.net). Tailwind from host CDN or none.
-- When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks rather than relying on utility classes that may or may not exist.
-- **Don't trust the JS console in Tampermonkey for ground-truth diagnostics. `document.querySelectorAll(...)` and similar return values are unreliable from the user's console environment. Use the Elements inspector and DOM outer HTML pastes instead.**
-- Top-level `await` at the browser console is unreliable — return values may show as `undefined` or fail silently. Don't trust console returns as ground truth; verify via in-code logging or DOM inspection.
+- When asked to edit a class, show edits cleanly without iterating over the same block multiple times. Each block in final form once.
+- **NEVER deliver a code edit with `// ... rest unchanged` or any placeholder comment that elides surrounding code.** User pastes verbatim; placeholder comments will break syntax.
+- When making CSS changes that depend on Tailwind utilities, prefer owning rules in inline `<style>` blocks. Demo uses a precompiled tailwind.css with explicit safelist — classes not in the safelist produce no CSS.
+- **Don't trust the JS console in Tampermonkey for ground-truth diagnostics.** Use the Elements inspector and DOM outerHTML pastes instead.
+- Top-level `await` at the browser console is unreliable. Verify via in-code logging or DOM inspection.
 - Long conversations degrade assistant accuracy — start fresh between phases.
-- **"Blame the cache" is a lazy diagnosis.** Do not reach for it as first guess. Stale userscript bundles ARE a real failure mode, but check the live DOM (Elements panel) before invoking it.
-- **Don't sneak previously-rejected suggestions back in.** When the user has said "no destroy methods" or "the inline view is out of scope," respect that decisively across every subsequent code block. Re-adding rejected patterns mid-refactor wastes the user's review time and erodes trust.
-- **When a refactor is ready to commit, take the user at their word about the test plan.** If they say "I'll commit everything and test the bundle," don't keep proposing commit-by-commit sequencing.
+- **"Blame the cache" is a lazy diagnosis.** Check the live DOM before invoking it.
+- **Don't sneak previously-rejected suggestions back in.** Respect "no destroy methods," "inline view is out of scope," etc. decisively across every subsequent code block.
+- **When a refactor is ready to commit, take the user at their word about the test plan.**
 - **ALWAYS deliver memory files inside a code block.** No exceptions.
 
-## Style block duplications to watch for (carried forward)
-- `.nova-tab-btn[draggable="true"] { cursor: grab; }` appears twice in the style block (cosmetic dup, low priority)
+## Style block duplications to watch for
+- `.nova-tab-btn[draggable="true"] { cursor: grab; }` may appear twice in the style block (cosmetic dup, low priority)
 - The privacy button class string lives in TWO places (`getHeaderHTML` + `updatePrivacyButton`) — sync risk every edit
 
-## Raw URLs (file fetching reference — NOTE: web_fetch on these is unreliable, ask user to paste)
+## Raw URLs (read from filesystem, not web_fetch)
 https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/core/utils.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/core/nova-toast.js
@@ -223,7 +172,7 @@ https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-add-customer-controller.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-dashboard-controller.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/controllers/nova-notifier-controller.js
-https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/base-nova-view.js
+https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-base-view.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-base-modal-view.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-admin-view.js
 https://raw.githubusercontent.com/dev-grimnir/nova-insight/main/src/views/nova-admin-manager-view.js
