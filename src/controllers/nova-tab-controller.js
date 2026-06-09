@@ -213,6 +213,7 @@ class NovaTabController {
      *                              and elapsed >= threshold, fire and stamp lastAlertSent
      */
     #evaluateAlerting(customer, tab, prevStatus) {
+        console.log(`[alert-trace] ${customer.radiusUsername} | isNetworkTab=${tab.isNetworkTab} suppressed=${customer.alertsSuppressed} prev=${prevStatus} cur=${customer.status} disconnectedSince=${customer.disconnectedSince} lastAlertSent=${customer.lastAlertSent}`);
         if (!tab.isNetworkTab) return;
         if (customer.alertsSuppressed) return;
 
@@ -224,8 +225,9 @@ class NovaTabController {
             && customer.lastEventTime instanceof Date
             && !isNaN(customer.lastEventTime.getTime())) {
             customer.markDisconnected(customer.lastEventTime.getTime());
+            console.log(`[alert-trace] ${customer.radiusUsername} | backfill: disconnectedSince set to ${customer.disconnectedSince}`);
         }
-        
+
         const newStatus = customer.status;
         const now = Date.now();
         const nodeName = customer.friendlyName || customer.radiusUsername;
@@ -234,6 +236,7 @@ class NovaTabController {
             if (customer.disconnectedSince === null) {
                 customer.markDisconnected(now);
             }
+            console.log(`[alert-trace] ${customer.radiusUsername} | transition Connected→Disconnected, clock started`);
             return;
         }
 
@@ -245,16 +248,21 @@ class NovaTabController {
                 NovaNotifierController.alert('Connected', nodeName, tab.label, reconnectedAt);
             }
             customer.markReconnected();
+            console.log(`[alert-trace] ${customer.radiusUsername} | transition Disconnected→Connected, cleared`);
             return;
         }
 
         if (newStatus === 'Disconnected'
             && customer.disconnectedSince !== null
             && customer.lastAlertSent === null) {
-            if ((now - customer.disconnectedSince) >= NovaTabController.DOWN_THRESHOLD_MS) {
+            const elapsed = now - customer.disconnectedSince;
+            console.log(`[alert-trace] ${customer.radiusUsername} | still down, elapsed=${Math.round(elapsed/1000)}s threshold=${NovaTabController.DOWN_THRESHOLD_MS/1000}s`);
+            if (elapsed >= NovaTabController.DOWN_THRESHOLD_MS) {
                 NovaNotifierController.alert('Disconnected', nodeName, tab.label, customer.disconnectedSince);
                 customer.markAlerted(now);
             }
+        } else if (newStatus === 'Disconnected') {
+            console.log(`[alert-trace] ${customer.radiusUsername} | down but skipped: disconnectedSince=${customer.disconnectedSince} lastAlertSent=${customer.lastAlertSent}`);
         }
     }
 
