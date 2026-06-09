@@ -55,6 +55,37 @@ class NovaNotifierController {
      */
     static async #dispatch(phoneNumber, message) {
         NovaToast.error(message, { duration: 10000 });
+        const klaxon = this.#startKlaxon();
         window.alert(message);
+        klaxon.stop();
+    }
+
+    static #startKlaxon() {
+        const ctx = new AudioContext();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.4;
+        gain.connect(ctx.destination);
+
+        let running = true;
+        let osc = null;
+        const freqs = [880, 660];
+        let phase = 0;
+
+        const cycle = () => {
+            if (!running) return;
+            osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freqs[phase % 2];
+            osc.connect(gain);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.4);
+            osc.onended = () => {
+                phase++;
+                cycle();
+            };
+        };
+
+        cycle();
+        return { stop: () => { running = false; osc?.stop(); ctx.close(); } };
     }
 }
