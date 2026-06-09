@@ -54,7 +54,6 @@ class NovaNotifierController {
      * so the signature stays stable when the real transport goes in.
      */
     static async #dispatch(phoneNumber, message) {
-        const target = phoneNumber ? `Notifier → ${phoneNumber}` : 'Notifier';
-        window.alert(`[${target}]\n${message}`);
+        NovaToast.error(message, { duration: 10000 });
     }
 }
