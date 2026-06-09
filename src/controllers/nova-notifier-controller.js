@@ -55,5 +55,6 @@ class NovaNotifierController {
      */
     static async #dispatch(phoneNumber, message) {
         NovaToast.error(message, { duration: 10000 });
+        window.alert(message);
     }
 }
