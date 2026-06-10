@@ -1,7 +1,17 @@
 class NovaCustomerView extends BaseNovaView {
+    static #REMOTES = {
+        '632': ['632', 'Adtran#1', 'Adtran#1X2', 'Lincoln', 'Carlton', 'Pine', 'Almond',
+                "Swifty's 1124P", 'Gallaway', 'Adran#2', 'Adrran#2x2', 'Amish', 'Adran#3',
+                'Amoco', 'Alta-Vista', "Redd's", 'Woodland'],
+        '644': ['Marianna CO', 'Bebout', 'Burnazzi', 'Cokeburg', 'Crawford', 'FAVA',
+                'Gameland', 'Highland', 'Lone Pine', 'Dutch Glory', 'Palyas', 'Scenery Hill',
+                'Grimes', 'Ten Mile', 'Ten Mile 1148VX', 'Turkeyfoot 1148V', 'Vesta', 'Weaver'],
+    };
+
     #controller;
     #tr;
     #isEditing = false;
+    #isEditingRemote = false;
 
     constructor(controller) {
         super();
@@ -127,6 +137,11 @@ class NovaCustomerView extends BaseNovaView {
                 </span>
             </td>
             <td class="px-2 py-1 text-sm text-gray-400 font-mono">${cust.radiusUsername}</td>
+            <td class="px-2 py-1 remote-cell">
+                <span class="remote-label cursor-pointer select-none text-sm text-zinc-400 hover:text-zinc-200 transition-colors" title="Click to set remote">
+                    ${cust.remote || '—'}
+                </span>
+            </td>
             <td class="px-2 py-1">
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border cursor-pointer hover:brightness-125 hover:scale-105 transition-all ${style.bg} ${style.text} ${style.border}" title="Click to view 72 hour connection timeline">
                     <span class="flex h-2 w-2 rounded-full ${style.dot} ring-1 ring-offset-1 ring-offset-gray-900"></span>
@@ -148,6 +163,7 @@ class NovaCustomerView extends BaseNovaView {
         if (host) host.appendChild(inlineSnapshot);
 
         if (this.#isEditing) this.#enterEditMode();
+        if (this.#isEditingRemote) this.#enterRemoteEditMode();
     }
 
     #attachListeners() {
@@ -170,6 +186,12 @@ class NovaCustomerView extends BaseNovaView {
             if (nameSpan && !this.#isEditing) {
                 e.preventDefault();
                 this.#enterEditMode();
+                return;
+            }
+
+            if (e.target.closest('.remote-label') && !this.#isEditingRemote) {
+                e.preventDefault();
+                this.#enterRemoteEditMode();
                 return;
             }
 
@@ -212,6 +234,46 @@ class NovaCustomerView extends BaseNovaView {
         this.#tr.addEventListener('remove', () => {
             document.removeEventListener('click', handleOutside);
         }, { once: true });
+    }
+
+    #enterRemoteEditMode() {
+        this.#isEditingRemote = true;
+        const cell = this.#tr.querySelector('.remote-cell');
+        const current = this.#controller.model.remote || '';
+
+        const options = Object.entries(NovaCustomerView.#REMOTES).map(([co, remotes]) => {
+            const opts = remotes.map(r =>
+                `<option value="${r}"${r === current ? ' selected' : ''}>${r}</option>`
+            ).join('');
+            return `<optgroup label="CO ${co}">${opts}</optgroup>`;
+        }).join('');
+
+        cell.innerHTML = `
+            <select class="remote-select bg-zinc-800 text-gray-100 text-sm px-1 py-0.5 rounded border border-blue-500/60 w-full focus:outline-none focus:border-blue-400">
+                <option value="">—</option>
+                ${options}
+            </select>
+        `;
+
+        const select = cell.querySelector('select');
+        select.focus();
+        select.addEventListener('change', () => this.#commitRemoteEdit());
+        select.addEventListener('blur',   () => this.#cancelRemoteEdit());
+        select.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.#cancelRemoteEdit(); });
+    }
+
+    #commitRemoteEdit() {
+        if (!this.#isEditingRemote) return;
+        this.#isEditingRemote = false;
+        const select = this.#tr.querySelector('.remote-select');
+        if (select) this.#controller.updateRemote(select.value);
+        this.#renderContent();
+    }
+
+    #cancelRemoteEdit() {
+        if (!this.#isEditingRemote) return;
+        this.#isEditingRemote = false;
+        this.#renderContent();
     }
 
     #enterEditMode() {

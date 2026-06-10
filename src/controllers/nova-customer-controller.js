@@ -65,6 +65,12 @@ class NovaCustomerController {
         return true;
     }
 
+    async updateRemote(value) {
+        this.model.remote = (value || '').trim();
+        await this.dashboardController.getTabController().save();
+        this.view.update();
+    }
+
     async toggleAlertsSuppressed() {
         const wasSupPressed = this.model.alertsSuppressed;
         this.model.toggleAlertsSuppressed();

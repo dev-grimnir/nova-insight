@@ -9,6 +9,7 @@ class NovaCustomerModel {
         this.durationSec = state.durationSec ?? 0;
         this.lastUpdate = state.lastUpdate || new Date().toLocaleString();
         this.lastEventTime = state.lastEventTime ? new Date(state.lastEventTime) : null;
+        this.remote            = (state.remote || '').trim();
         this.alertsSuppressed  = state.alertsSuppressed === true;
         this.disconnectedSince = (typeof state.disconnectedSince === 'number') ? state.disconnectedSince : null;
         this.lastAlertSent     = (typeof state.lastAlertSent === 'number')     ? state.lastAlertSent     : null;
@@ -104,7 +105,8 @@ class NovaCustomerModel {
                 durationSec: json.durationSec ?? 0,
                 lastUpdate: json.lastUpdate,
                 lastEventTime: json.lastEventTime,
-                alertsSuppressed: json.alertsSuppressed,
+                remote: json.remote,
+            alertsSuppressed: json.alertsSuppressed,
                 disconnectedSince: json.disconnectedSince,
                 lastAlertSent: json.lastAlertSent,
                 eventHistory: json.eventHistory
@@ -122,6 +124,7 @@ class NovaCustomerModel {
         }
 
         return {
+            remote: this.remote,
             alertsSuppressed: this.alertsSuppressed,
             radiusUsername: this.radiusUsername,
             friendlyName: this.friendlyName,

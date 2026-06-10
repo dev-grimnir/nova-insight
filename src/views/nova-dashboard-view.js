@@ -1,12 +1,13 @@
 class NovaDashboardView extends BaseNovaView {
     static COLUMNS = [
-        { key: 'friendlyName', label: 'Friendly Name',   width: 18, align: 'left'  },
-        { key: 'radiusUser',   label: 'RADIUS UN', width: 18, align: 'left'  },
-        { key: 'status',       label: 'Status',          width: 10, align: 'left'  },
-        { key: 'duration',     label: 'Duration',        width: 14, align: 'left'  },
-        { key: 'snapshot',     label: '24 Hr Snapshot',        width: 28, align: 'left'  },
-        { key: 'action',       label: 'Action',          width: 12, align: 'right' }
-        ];
+        { key: 'friendlyName', label: 'Friendly Name',  width: 16, align: 'left'  },
+        { key: 'radiusUser',   label: 'RADIUS UN',      width: 13, align: 'left'  },
+        { key: 'remote',       label: 'Remote',         width: 11, align: 'left'  },
+        { key: 'status',       label: 'Status',         width:  9, align: 'left'  },
+        { key: 'duration',     label: 'Duration',       width: 12, align: 'left'  },
+        { key: 'snapshot',     label: '24 Hr Snapshot', width: 29, align: 'left'  },
+        { key: 'action',       label: 'Action',         width: 10, align: 'right' },
+    ];
     
     constructor(controller) {
         super();
@@ -37,7 +38,7 @@ class NovaDashboardView extends BaseNovaView {
     }
 
     static buildTheadHTML(activeTab = null) {
-        const SORTABLE = new Set(['friendlyName', 'radiusUser', 'status', 'duration']);
+        const SORTABLE = new Set(['friendlyName', 'radiusUser', 'remote', 'status', 'duration']);
     
         const ths = NovaDashboardView.COLUMNS.map(c => {
             if (!SORTABLE.has(c.key)) {

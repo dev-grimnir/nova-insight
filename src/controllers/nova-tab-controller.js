@@ -432,6 +432,13 @@ class NovaTabController {
                     return (a.model?.durationSec || 0) - (b.model?.durationSec || 0);
                 };
 
+            case 'remote':
+                return (a, b) => {
+                    const aRemote = a.model?.remote || '';
+                    const bRemote = b.model?.remote || '';
+                    return aRemote.localeCompare(bRemote) * flip;
+                };
+
             case 'duration':
                 return (a, b) => {
                     const aDur = a.model?.durationSec || 0;
