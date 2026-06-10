@@ -167,6 +167,15 @@ class NovaCustomerView extends BaseNovaView {
     }
 
     #attachListeners() {
+        this.#tr.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.remote-label') && !this.#isEditingRemote) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.#enterRemoteEditMode();
+                return;
+            }
+        });
+
         this.#tr.addEventListener('click', (e) => {
             if (e.target.closest('.alert-bell-toggle')) {
                 e.preventDefault();
@@ -186,13 +195,6 @@ class NovaCustomerView extends BaseNovaView {
             if (nameSpan && !this.#isEditing) {
                 e.preventDefault();
                 this.#enterEditMode();
-                return;
-            }
-
-            if (e.target.closest('.remote-label') && !this.#isEditingRemote) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.#enterRemoteEditMode();
                 return;
             }
 
