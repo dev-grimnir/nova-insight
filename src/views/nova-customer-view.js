@@ -191,6 +191,7 @@ class NovaCustomerView extends BaseNovaView {
 
             if (e.target.closest('.remote-label') && !this.#isEditingRemote) {
                 e.preventDefault();
+                e.stopPropagation();
                 this.#enterRemoteEditMode();
                 return;
             }
