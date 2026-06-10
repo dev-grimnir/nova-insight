@@ -152,8 +152,7 @@ class NovaDashboardView extends BaseNovaView {
             position: fixed;
             left: 50%;
             transform: translateX(-50%);
-            width: 92%;
-            max-width: 1100px;
+            width: 98%;
             background: #09090b;
             color: white;
             font-family: system-ui;
