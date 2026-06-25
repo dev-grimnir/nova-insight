@@ -28,7 +28,7 @@ class NovaAddCustomerController {
 
         let cleaned = raw.trim().replace(/\s+/g, '');
 
-        cleaned = cleaned.replace(/[^a-zA-Z0-9.]/g, '');
+        cleaned = cleaned.replace(/[^a-zA-Z0-9._-]/g, '');
 
         if (cleaned.length < 3 || cleaned.length > 64) {
             this.view.showError("Username must be 3–64 characters.");
